@@ -1,12 +1,12 @@
 all: serverApp.o clientApp.o
-	g++ serverApp.o Server.o -o server -lpthread -Wall
-	g++ clientApp.o Client.o -o client -lpthread -Wall
+	g++ serverApp.o Server.o -o ./bin/server -lpthread -Wall
+	g++ clientApp.o Client.o -o ./bin/client -lpthread -Wall
 	
-serverApp.o: serverApp.cpp Server.cpp Server.h data_types.h constants.h
-	g++ -c serverApp.cpp Server.cpp Server.h data_types.h constants.h -Wall
+serverApp.o: ./src/serverApp.cpp ./src/Server.cpp ./src/Server.h ./src/data_types.h ./src/constants.h
+	g++ -c ./src/serverApp.cpp ./src/Server.cpp ./src/Server.h ./src/data_types.h ./src/constants.h -Wall
 
-clientApp.o: clientApp.cpp Client.cpp Client.h data_types.h constants.h
-	g++ -c clientApp.cpp Client.cpp Client.h data_types.h constants.h -Wall
+clientApp.o: ./src/clientApp.cpp ./src/Client.cpp ./src/Client.h ./src/data_types.h ./src/constants.h
+	g++ -c ./src/clientApp.cpp ./src/Client.cpp ./src/Client.h ./src/data_types.h ./src/constants.h -Wall
 
 clean:
-	rm *.o *.gch server client *.hist
+	rm *.o ./src/*.gch ./bin/server ./bin/client ./bin/*.hist
