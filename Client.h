@@ -7,13 +7,12 @@
 #include <unistd.h>
 #include <iostream>
 
-//#include "structures.h"
 #include "constants.h"
 #include "data_types.h"
 
 class Client
 {
-    // Private members
+    // Private attributes
     private:
 
     std::string username;       // Client display name
@@ -23,7 +22,7 @@ class Client
     int         server_socket;  // Socket for remote server communication
     struct sockaddr_in server_address; // Server socket address
 
-    // Public functions
+    // Public methods
     public:
     /**
      * Class constructor

@@ -6,17 +6,6 @@
 #define USER_TIMEOUT 60      // Time (in seconds) for user to be kept alive
 #define PACKET_MAX   2048    // Maximum size (in bytes) for a packet
 
-// Error codes TODO FUCK THIS
-#define ERROR_SOCKET_CREATION   -1
-#define ERROR_IP_INVALID        -2
-#define ERROR_CONNECTION_FAILED -3
-#define ERROR_SOCKET_BIND       -4
-#define ERROR_SOCKET_LISTEN     -5
-#define ERROR_INVALID_USERNAME  -6
-#define ERROR_INVALID_GROUPNAME -7
-#define ERROR_THREAD_CREATION   -8
-#define ERROR_SOCKET_OPTION     -9
-
 // Packet types
 #define PAK_DAT 0 // Message packet
 #define PAK_CMD 1 // Command packet
