@@ -18,6 +18,8 @@ void handle_error(int status);
 
 /* Returns a reference to user if it is connected, NULL otherwise */
 user_t *user_connected(std::string username);
+/* Returns a reference to group if it is currently active, or creates group if it isn't */
+group_t *group_active(std::string groupname);
 
 /* Shared data between threads*/
 /* TODO Mutex lock this variable*/
@@ -183,6 +185,7 @@ void *CommManager(void* arg)
     int read_bytes = 0;                  // Number of bytes read from the message
     char client_message[PACKET_MAX];     // Buffer for client message, maximum of PACKET_MAX bytes
     login_payload* login_payload_buffer; // Buffer for client login information
+    std::string message;                 // User chat message
 
     /* User connected through this thread and group they are connected to */
     user_t* user = NULL;
@@ -193,17 +196,13 @@ void *CommManager(void* arg)
     /* Wait for messages from client*/
     while( (read_bytes = recv(socket, client_message, PACKET_MAX, 0)) > 0 && !shared_data.stop_issued )
     {
-        std::cout << "Received packet with " << read_bytes << " bytes" << std::endl;
-
         // Decode received data into a packet structure
         packet* received_packet = (packet *)client_message;
         
         // Print packet info to screen
-        std::cout << "Type:      " << received_packet->type << std::endl;
-        std::cout << "Sequence:  " << received_packet->sqn << std::endl;
-        std::cout << "Length:    " << received_packet->length << std::endl;
-        std::cout << "Timestamp: " << received_packet->timestamp << std::endl;
-        //std::cout << "Payload:   " << received_packet->_payload << std::endl;
+        std::cout << "[Server:CommManager] Received packet of type " << received_packet->type << " with " << read_bytes << " bytes" << std::endl;
+        //std::cout << "Sequence:  " << received_packet->sqn << std::endl;
+        //std::cout << "Length:    " << received_packet->length << std::endl;
 
         /* Check packet type */
         switch (received_packet->type)
@@ -211,13 +210,13 @@ void *CommManager(void* arg)
             /* Command packet: register user and group*/
             case PAK_CMD:
                 
-                std::cout << "    Received login packet from client " << std::endl;
+                std::cout << "[Server:CommManager] Received login packet from client: " << std::endl;
 
                 /* Get user login information*/         
                 login_payload_buffer = (login_payload*)received_packet->_payload;
                 
-                std::cout << "    username:  " << login_payload_buffer->username << std::endl;
-                std::cout << "    groupname: " << login_payload_buffer-> groupname << std::endl;
+                std::cout << "Username: " << login_payload_buffer->username;
+                std::cout << ", groupname: " << login_payload_buffer-> groupname << std::endl;
 
                 /* Check if user exists in the active list*/
                 if (( user = user_connected(login_payload_buffer->username) )!= NULL)
@@ -236,7 +235,7 @@ void *CommManager(void* arg)
                         /* Free client socket pointer */
                         free(arg);
 
-                        std::cout << "Client forcefully disconnected - Max "<< MAX_SESSIONS <<" sessions" << std::endl;
+                        std::cout << "[Server:CommManager] Client forcefully disconnected - Max "<< MAX_SESSIONS <<" sessions" << std::endl;
                         
                         /* Exit thread */
                         handle_error(0);
@@ -254,23 +253,15 @@ void *CommManager(void* arg)
                     shared_data.active_users.push_back(*user);
                 }
 
-                /* TODO Process group data*/
-
-                /* Check if group exists in active list */
-                if (false) // TODO
-                {
-
-                }
-                else
-                {
-                    
-                }
-                
+                /* Get the group information */
+                group = group_active(login_payload_buffer->groupname);
+                /* TODO Update user-group map */
 
                 break;
             /* Data packet: User messages to connected group */
             case PAK_DAT:
-                std::cout << "    [" << user->username << "] says: " << received_packet->_payload << std::endl;
+                std::cout << "[" << user->username << " @ " << group->groupname << "] says: " << received_packet->_payload << std::endl;
+
                 break;
             default:
                 break;
@@ -283,7 +274,7 @@ void *CommManager(void* arg)
     /* If client disconnected */
     if (read_bytes == 0) 
     {
-        std::cout << user->username << " disconnected" << std::endl;
+        std::cout << "[" << user->username << " @ " << group->groupname << "] disconnected" << std::endl;
         user->active_sessions--;
         
         /* If no active sessions for the user are left, free user space */
@@ -293,6 +284,9 @@ void *CommManager(void* arg)
             free(user);
         }
     }
+
+    /* Check if this was last user in group */
+    if (group != NULL && group->user_count == 0) fclose(group->history);
 
     /* Free client socket pointer */
     free(arg);
@@ -338,4 +332,37 @@ user_t *user_connected(std::string username)
     }
 
     return NULL;
+}
+
+/* TODO MUTEX */
+/* TODO Same as user_connected*/
+group_t *group_active(std::string groupname)
+{
+    FILE* history;
+    
+    /* Check if group history exists */    
+    if ( (history = fopen((groupname + ".hist").c_str(), "r+")) ==  NULL)
+    {
+        /* If history does not exist, create group */
+        group_t* new_group = (group_t*)malloc(sizeof(group_t));
+        strcpy(new_group->groupname, groupname.c_str());
+        new_group->history = fopen((groupname + ".hist").c_str(), "w+");
+        new_group->user_count = 1;
+
+        /* TODO Mutex */
+        shared_data.active_groups.push_back(*new_group);
+
+        return new_group;
+    }
+    else
+    {
+        for (std::vector<group_t>::iterator i = shared_data.active_groups.begin(); i != shared_data.active_groups.end(); ++i)
+        {
+            if (!groupname.compare(i->groupname))
+            {
+                /* Group exists in active list, return ref */
+                return &(*i);
+            }
+        }
+    }
 }
