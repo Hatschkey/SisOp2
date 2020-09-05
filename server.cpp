@@ -16,14 +16,28 @@ void *ServerManager(void* arg);
 /* Thread error hander, stops application */
 void handle_error(int status);
 
+/* Returns a reference to user if it is connected, NULL otherwise */
+user_t *user_connected(std::string username);
+
 /* Shared data between threads*/
 /* TODO Mutex lock this variable*/
 managed_data_t shared_data;
+
 
 /* Server entrypoint */
 /* $ ./server <N> */
 int main(int argc, char** argv)
 {
+
+    /* Server socket - related variables */
+    int server_socket, client_socket;                   // Server and client sockets
+    int sockaddr_size;                                  // Size of sockaddr_in struct
+    int* new_socket;                                    // Socket reference to client
+    struct sockaddr_in server_address, client_address;  // Server and client addresses
+
+    /* Manager module threads */
+    pthread_t message_manager, group_manager, server_command_manager;
+    std::vector<pthread_t> communication_threads; // List of all communication threads
 
     /* Parse command line input */
     if (argc < 2)
@@ -35,19 +49,10 @@ int main(int argc, char** argv)
     /* Get N */
     int N = atoi(argv[1]);
  
-    /* Start one thread for each manager module */
-    pthread_t message_manager, group_manager, server_command_manager;
-    
     pthread_create(&message_manager, NULL, MessageManager, NULL); // Message Manager (Group text messages, message metadata)
     pthread_create(&group_manager  , NULL, GroupManager  , NULL); // Group Manager (Groups, users)
     pthread_create(&server_command_manager, NULL, ServerManager, NULL); // Server command manager (Stop server, etc)
 
-    /* Start server */
-    int server_socket, client_socket;                   // Server and client sockets
-    int sockaddr_size;                                  // Size of sockaddr_in struct
-    int* new_socket;                                    // Socket reference to client
-    struct sockaddr_in server_address, client_address;  // Server and client addresses
-    
     /* Create server socket */
     if ( (server_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0 )
     {
@@ -98,6 +103,8 @@ int main(int argc, char** argv)
             return ERROR_THREAD_CREATION;
         }
           
+        /* Add thread to list */
+        communication_threads.push_back(comm_thread);
     }
     
     close(server_socket);
@@ -110,6 +117,17 @@ int main(int argc, char** argv)
     std::cout << "[Server:Main] Message manager finished with status " << *thread_status << std::endl;
     pthread_join(group_manager  , (void**)&thread_status);
     std::cout << "[Server:Main] Group manager finished with status " << *thread_status << std::endl;
+    
+    /* TODO Do something to stop client comunication threads*/
+
+    /* Wait for each client communication to end */
+    for (std::vector<pthread_t>::iterator i = communication_threads.begin(); i != communication_threads.end(); ++i)
+    {
+        std::cout << "[Server:Main] Waiting for client communication to end..." << std::endl;
+        pthread_t* ref = &(*i);
+        pthread_join(*ref, NULL);
+    }
+
 
     /* End */
     std::cout << "[Server:Main] Server finishing..." << std::endl;
@@ -166,7 +184,7 @@ void *CommManager(void* arg)
     char client_message[PACKET_MAX];     // Buffer for client message, maximum of PACKET_MAX bytes
     login_payload* login_payload_buffer; // Buffer for client login information
 
-    /* User connected to this thread and group they are connected to */
+    /* User connected through this thread and group they are connected to */
     user_t* user = NULL;
     group_t* group = NULL;
 
@@ -202,20 +220,52 @@ void *CommManager(void* arg)
                 std::cout << "    groupname: " << login_payload_buffer-> groupname << std::endl;
 
                 /* Check if user exists in the active list*/
-                if (false) // TODO
+                if (( user = user_connected(login_payload_buffer->username) )!= NULL)
                 {
-                    /* Get user reference from user list */
+                    /* User is already connected, increase session count */
+                    /* TODO Mutex */
+                    /* If user has less than 2 active sessions, allow them to connect */
+                    if (user->active_sessions < 2) user->active_sessions++;
+                    else 
+                    {
+                        /* TODO Send packet to user informing max 2 sessions */
+
+                        /* Close client socket */
+                        close(socket);
+
+                        /* Free client socket pointer */
+                        free(arg);
+
+                        std::cout << "Client forcefully disconnected - Max "<< MAX_SESSIONS <<" sessions" << std::endl;
+                        
+                        /* Exit thread */
+                        handle_error(0);
+                    }
                 }
                 else
                 {
                     /* Create new user and initialize data */
                     user = (user_t*)malloc(sizeof(user_t));
-                    user->active_sessions = 0;
+                    user->active_sessions = 1;
                     user->last_seen = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
                     strcpy(user->username, login_payload_buffer->username);
+
+                    /* TODO MUTEX Add to active user list */
+                    shared_data.active_users.push_back(*user);
                 }
 
                 /* TODO Process group data*/
+
+                /* Check if group exists in active list */
+                if (false) // TODO
+                {
+
+                }
+                else
+                {
+                    
+                }
+                
 
                 break;
             /* Data packet: User messages to connected group */
@@ -230,13 +280,22 @@ void *CommManager(void* arg)
         for (int i=0; i < PACKET_MAX; i++) client_message[i] = '\0';
 
     }
-    if (read_bytes == 0) std::cout << user->username << " disconnected" << std::endl;
+    /* If client disconnected */
+    if (read_bytes == 0) 
+    {
+        std::cout << user->username << " disconnected" << std::endl;
+        user->active_sessions--;
+        
+        /* If no active sessions for the user are left, free user space */
+        if (user->active_sessions == 0)
+        {
+            /* TODO Mutex */
+            free(user);
+        }
+    }
 
     /* Free client socket pointer */
     free(arg);
-
-    /* Free user structure if needed */
-    if (user != NULL) free(user);
 
     /* Finish with status code 0 */
     handle_error(0);
@@ -266,3 +325,17 @@ void handle_error(int status)
     pthread_exit(retval);
 }
 
+/* TODO MUTEX */
+/* TODO Change vector to set, string to char, etc */
+user_t *user_connected(std::string username)
+{
+    for (std::vector<user_t>::iterator i = shared_data.active_users.begin(); i != shared_data.active_users.end(); ++i)
+    {
+        if (!username.compare(i->username))
+        {
+            return &(*i);   
+        }
+    }
+
+    return NULL;
+}

@@ -8,6 +8,8 @@
 #include <regex>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <signal.h>
+#include <poll.h>
 #include <ctime>
 #include <chrono>
 
@@ -56,7 +58,7 @@ typedef struct __login_payload
 /* Information about a user connected to the application (Managed by the server) */
 typedef struct __user
 {
-    char username[20];          // User display name
+    char username[21];          // User display name
     uint16_t active_sessions;   // Current active session count (Must be less than MAX_SESSIONS)
     uint16_t last_seen;         // Timestamp for last message received by this user
     
@@ -65,7 +67,8 @@ typedef struct __user
 /* Information about a group (Managed by the server) */
 typedef struct __group
 {
-    char groupname[20];
+    char groupname[21];     // Group name
+    char group_history[26]; // Group chat history file name
     
 } group_t;
 
@@ -74,7 +77,7 @@ typedef struct __group
 typedef struct __managed_data
 {
     int stop_issued = 0;    // Signal if the server is stopping to threads
-    
+
     std::vector<group_t>                   active_groups;  // Current active groups 
     std::vector<user_t>                    active_users;   // Current active users 
     std::map<group_t, std::vector<user_t>> sessions;       // Current users in each group 

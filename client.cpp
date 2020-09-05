@@ -101,6 +101,8 @@ int main(int argc, char** argv)
     std::cout << "Logged in as " << username << " in group " << groupname <<std::endl;
     std::cout << "     Say something: ";
 
+    /* TODO Get packet(s) from server in order to display group chat and old messages */
+
     /* TODO Just testing sending packets through sockets */
     std::string user_message;
     while (std::getline(std::cin, user_message))
