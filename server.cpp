@@ -1,0 +1,268 @@
+#include <pthread.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include "structures.h"
+
+
+/* Message Manager Thread */
+void *MessageManager(void* arg);
+/* Group Manager Thread */
+void *GroupManager(void* arg);
+/* Communication Manager Thread */
+void *CommManager(void* arg);
+/* Server command manager Thread */
+void *ServerManager(void* arg);
+
+/* Thread error hander, stops application */
+void handle_error(int status);
+
+/* Shared data between threads*/
+/* TODO Mutex lock this variable*/
+managed_data_t shared_data;
+
+/* Server entrypoint */
+/* $ ./server <N> */
+int main(int argc, char** argv)
+{
+
+    /* Parse command line input */
+    if (argc < 2)
+    {
+        std::cerr << "Usage: " << argv[0] << " <N> " << std::endl;
+        return 1;
+    }
+    
+    /* Get N */
+    int N = atoi(argv[1]);
+ 
+    /* Start one thread for each manager module */
+    pthread_t message_manager, group_manager, server_command_manager;
+    
+    pthread_create(&message_manager, NULL, MessageManager, NULL); // Message Manager (Group text messages, message metadata)
+    pthread_create(&group_manager  , NULL, GroupManager  , NULL); // Group Manager (Groups, users)
+    pthread_create(&server_command_manager, NULL, ServerManager, NULL); // Server command manager (Stop server, etc)
+
+    /* Start server */
+    int server_socket, client_socket;                   // Server and client sockets
+    int sockaddr_size;                                  // Size of sockaddr_in struct
+    int* new_socket;                                    // Socket reference to client
+    struct sockaddr_in server_address, client_address;  // Server and client addresses
+    
+    /* Create server socket */
+    if ( (server_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0 )
+    {
+        std::cerr << "Error during socket creation: " << server_socket << std::endl;
+        return ERROR_SOCKET_CREATION;
+    }
+    
+    /* Prepare server address */
+    server_address.sin_family = AF_INET;
+    server_address.sin_addr.s_addr = INADDR_ANY;
+    server_address.sin_port = htons(SERVER_PORT);
+    
+    /* Set socket options*/
+    int yes = 1;
+    if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1)
+    {
+        std::cerr << "Error setting socket options" << std::endl;
+        return ERROR_SOCKET_OPTION;
+    }
+    
+    /* Bind socket */
+    if ( bind(server_socket, (struct sockaddr *)&server_address, sizeof(server_address)) < 0 )
+    {
+        std::cerr << "Error during socket bind" << std::endl;
+        return ERROR_SOCKET_BIND;
+    }
+    
+    /* Listen at socket */
+    listen(server_socket, 3);
+
+    /* Wait for incoming connections */
+    std::cout << "[Server:Main] Ready to receive connections" << std::endl;
+    sockaddr_size = sizeof(struct sockaddr_in);
+    while(!shared_data.stop_issued && (client_socket = accept(server_socket, (struct sockaddr*)&client_address, (socklen_t*)&sockaddr_size)) )
+    {
+        std::cout << "[Server:Main] New connection accepted" << std::endl;
+        
+        /* Start new thread for new connection */
+        pthread_t comm_thread;
+        
+        /* Get reference to client thread */
+        new_socket = (int*)malloc(1);
+        *new_socket = client_socket;
+        
+        if (pthread_create( &comm_thread, NULL, CommManager, (void*)new_socket) < 0)
+        {
+            std::cerr << "Could not create thread for socket " << client_socket << std::endl;
+            return ERROR_THREAD_CREATION;
+        }
+          
+    }
+    
+    close(server_socket);
+    
+    std::cout << "[Server:Main] Waiting for threads to end..." << std::endl;
+    
+    /* Wait for threads to finish */
+    int *thread_status; // Returned value by threads
+    pthread_join(message_manager, (void**)&thread_status);
+    std::cout << "[Server:Main] Message manager finished with status " << *thread_status << std::endl;
+    pthread_join(group_manager  , (void**)&thread_status);
+    std::cout << "[Server:Main] Group manager finished with status " << *thread_status << std::endl;
+
+    /* End */
+    std::cout << "[Server:Main] Server finishing..." << std::endl;
+	return 0;
+}
+
+/*
+    MESSAGE MANAGER
+*/
+void *MessageManager(void* arg)
+{
+
+    /* TODO Setup*/
+    
+    while(!shared_data.stop_issued)
+    {
+        //std::cout << "Message manager running" << std::endl;  
+    }
+    
+    /* TODO Cleanup*/
+    
+    /* Finish thread */
+    handle_error(0);
+}
+
+/*
+    GROUP MANAGER
+*/
+void *GroupManager(void* arg)
+{
+
+    /* TODO Setup*/
+        
+
+    while(!shared_data.stop_issued)
+    {
+        //std::cout << "Group manager running" << std::endl;  
+    }
+    
+    /* TODO Cleanup*/
+
+    /* Finish thread*/
+    handle_error(0);
+}
+
+/*
+    COMMUNICATION MANAGER
+*/
+void *CommManager(void* arg)
+{
+    /* Get client socket */
+    int socket = *(int*)arg;
+    int read_bytes = 0;                  // Number of bytes read from the message
+    char client_message[PACKET_MAX];     // Buffer for client message, maximum of PACKET_MAX bytes
+    login_payload* login_payload_buffer; // Buffer for client login information
+
+    /* User connected to this thread and group they are connected to */
+    user_t* user = NULL;
+    group_t* group = NULL;
+
+    /* TODO Perform some validations */
+
+    /* Wait for messages from client*/
+    while( (read_bytes = recv(socket, client_message, PACKET_MAX, 0)) > 0 && !shared_data.stop_issued )
+    {
+        std::cout << "Received packet with " << read_bytes << " bytes" << std::endl;
+
+        // Decode received data into a packet structure
+        packet* received_packet = (packet *)client_message;
+        
+        // Print packet info to screen
+        std::cout << "Type:      " << received_packet->type << std::endl;
+        std::cout << "Sequence:  " << received_packet->sqn << std::endl;
+        std::cout << "Length:    " << received_packet->length << std::endl;
+        std::cout << "Timestamp: " << received_packet->timestamp << std::endl;
+        //std::cout << "Payload:   " << received_packet->_payload << std::endl;
+
+        /* Check packet type */
+        switch (received_packet->type)
+        {
+            /* Command packet: register user and group*/
+            case PAK_CMD:
+                
+                std::cout << "    Received login packet from client " << std::endl;
+
+                /* Get user login information*/         
+                login_payload_buffer = (login_payload*)received_packet->_payload;
+                
+                std::cout << "    username:  " << login_payload_buffer->username << std::endl;
+                std::cout << "    groupname: " << login_payload_buffer-> groupname << std::endl;
+
+                /* Check if user exists in the active list*/
+                if (false) // TODO
+                {
+                    /* Get user reference from user list */
+                }
+                else
+                {
+                    /* Create new user and initialize data */
+                    user = (user_t*)malloc(sizeof(user_t));
+                    user->active_sessions = 0;
+                    user->last_seen = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+                    strcpy(user->username, login_payload_buffer->username);
+                }
+
+                /* TODO Process group data*/
+
+                break;
+            /* Data packet: User messages to connected group */
+            case PAK_DAT:
+                std::cout << "    [" << user->username << "] says: " << received_packet->_payload << std::endl;
+                break;
+            default:
+                break;
+        }
+
+        /* Clear buffer for next packets*/
+        for (int i=0; i < PACKET_MAX; i++) client_message[i] = '\0';
+
+    }
+    if (read_bytes == 0) std::cout << user->username << " disconnected" << std::endl;
+
+    /* Free client socket pointer */
+    free(arg);
+
+    /* Free user structure if needed */
+    if (user != NULL) free(user);
+
+    /* Finish with status code 0 */
+    handle_error(0);
+}
+
+void *ServerManager(void* arg)
+{
+    /* Get commands from server administrator */
+    std::string user_command;
+    while(std::getline(std::cin, user_command))
+    {
+        /* TODO Process commands*/
+    }
+
+    /* TODO mutex */
+    shared_data.stop_issued = 1;
+    pthread_exit(NULL);
+}
+
+void handle_error(int status)
+{
+    /* Get return value for exiting thread */
+    int* retval = (int*)malloc(sizeof(int));
+    *retval = status;
+
+    /* Exit thread */
+    pthread_exit(retval);
+}
+
