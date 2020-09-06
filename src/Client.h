@@ -6,6 +6,7 @@
 #include <chrono>
 #include <unistd.h>
 #include <iostream>
+#include <atomic>
 
 #include "constants.h"
 #include "data_types.h"
@@ -15,12 +16,15 @@ class Client
     // Private attributes
     private:
 
-    std::string username;       // Client display name
-    std::string groupname;      // Group the client wishes to join
-    std::string server_ip;      // IP of the remote server
-    int         server_port;    // Port the remote server listens at
-    int         server_socket;  // Socket for remote server communication
-    struct sockaddr_in server_address; // Server socket address
+    static std::atomic<bool> stop_issued;   // Atomic flag for stopping all threads
+    std::string username;                   // Client display name
+    std::string groupname;                  // Group the client wishes to join
+    std::string server_ip;                  // IP of the remote server
+    int         server_port;                // Port the remote server listens at
+    int         server_socket;              // Socket for remote server communication
+    struct sockaddr_in server_address;      // Server socket address
+
+    pthread_t server_listener_thread;       // Thread to listen for new incoming server messages
 
     // Public methods
     public:
@@ -43,6 +47,19 @@ class Client
      * Setup connection to remote server
      */
     void setupConnection();
+
+    /**
+     * Handles getting user input so that it may be sent to the remtoe server
+     */
+    void handleUserInput();
+
+    private:
+
+    /**
+     * Poll server for any new messages, showing them to the user
+     * This should run in a separate thread to handleUserInput
+     */
+    static void *getMessages(void* arg);
 
     /**
      * Send packet to server with login information (User and Group)

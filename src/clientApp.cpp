@@ -22,29 +22,8 @@ int main(int argc, char** argv)
         // Setup a connection to the server
         client.setupConnection();
 
-        // Send first packet (login packet)
-        client.sendLoginPacket(); 
-
-        // TODO Start thread to get messages from the server
-
-        // Get user messages to be sent until Ctrl D is pressed
-        std::string user_message;
-        while(std::getline(std::cin, user_message))
-        {
-            try
-            {
-                client.sendMessagePacket(user_message);
-            }
-            catch(const std::runtime_error& e)
-            {
-                std::cerr << e.what() << std::endl;
-            }
-            
-        }
-
-        // TODO Signal server-listening thread to end
-
-        // TODO pthread_join that thread
+        // Start getting user messages to be sent
+        client.handleUserInput();
         
     }
     catch(const std::invalid_argument& e)

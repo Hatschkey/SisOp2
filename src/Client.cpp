@@ -1,5 +1,7 @@
 #include "Client.h"
 
+std::atomic<bool> Client::stop_issued;
+
 Client::Client(std::string username, std::string groupname, std::string server_ip, std::string server_port)
 {
     // Validate username
@@ -22,6 +24,9 @@ Client::Client(std::string username, std::string groupname, std::string server_i
     this->server_ip = server_ip;
     this->server_port = stoi(server_port);
     this->server_socket = -1;
+
+    // Set atomic flag as false
+    stop_issued = false;
 };
 
 Client::~Client()
@@ -29,6 +34,7 @@ Client::~Client()
     // Close server socket if it is still open
     if (server_socket > 0)
         close(server_socket);
+
 };
 
 void Client::setupConnection()
@@ -46,6 +52,48 @@ void Client::setupConnection()
     if (connect(server_socket, (struct sockaddr *)&server_address, sizeof(server_address)) < 0)
         throw std::runtime_error("Error connecting to server");
 
+    // Send the first packet for login
+    sendLoginPacket();
+
+    // Start message getter thread
+    pthread_create(&server_listener_thread,NULL, getMessages, NULL);
+
+};
+
+void Client::handleUserInput()
+{
+    // Get user messages to be sent until Ctrl D is pressed
+    std::string user_message;
+    do
+    {
+        std::cout << "Say something: ";
+        try
+        {
+            sendMessagePacket(user_message);
+        }
+        catch(const std::runtime_error& e)
+        {
+            std::cerr << e.what() << std::endl;
+        }
+        
+    }
+    while(std::getline(std::cin, user_message));
+
+    // Signal server-litening thread to stop
+    stop_issued = true;
+
+    // Wait for thread to finish
+    pthread_join(server_listener_thread,NULL);
+};
+
+void *Client::getMessages(void* arg)
+{
+    while(!stop_issued)
+    {
+       // TODO Listen to server messages
+    }
+
+    pthread_exit(NULL);
 };
 
 int Client::sendLoginPacket()
@@ -104,7 +152,7 @@ int Client::sendMessagePacket(std::string message)
     packet_size = sizeof(*data) + (sizeof(char) * payload_size);
 
     // Send packet
-    if ( (bytes_sent = send(server_socket, data, packet_size, 0)) < 0)
+    if ( (bytes_sent = send(server_socket, data, packet_size, 0)) <= 0)
         throw std::runtime_error("Unable to send message to server");
 
     // Free memory used for packet
