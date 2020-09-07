@@ -1,3 +1,6 @@
+#ifndef DATA_TYPES_H
+#define DATA_TYPES_H
+
 #include <iostream>
 #include <map>
 
@@ -47,15 +50,4 @@ typedef struct __group
 
 } group_t;
 
-/**
- * Shared data between the server threads
- * TODO Protect the entire struct with a mutex, or each single variable with it's mutex
- */
-typedef struct __managed_data
-{
-    int stop_issued = 0;    // Signal if the server is stopping to threads
-
-    std::map<std::string, group_t*>     active_groups;  // Current active groups 
-    std::map<std::string, user_t*>      active_users;   // Current active users 
-
-} managed_data_t;
+#endif
