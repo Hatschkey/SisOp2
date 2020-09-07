@@ -7,6 +7,6 @@
 #define PACKET_MAX   2048    // Maximum size (in bytes) for a packet
 
 // Packet types
-#define PAK_DAT 0 // Message packet
-#define PAK_CMD 1 // Command packet
-#define PAK_KAL 2 // Keep-Alive packet
+#define PAK_DAT 1 // Message packet
+#define PAK_CMD 2 // Command packet
+#define PAK_KAL 3 // Keep-Alive packet

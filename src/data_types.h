@@ -1,5 +1,5 @@
 #include <iostream>
-#include <vector>
+#include <map>
 
 // Packet that is sent between server and client
 typedef struct __packet
@@ -55,7 +55,7 @@ typedef struct __managed_data
 {
     int stop_issued = 0;    // Signal if the server is stopping to threads
 
-    std::vector<group_t>                   active_groups;  // Current active groups 
-    std::vector<user_t>                    active_users;   // Current active users 
+    std::map<std::string, group_t*>     active_groups;  // Current active groups 
+    std::map<std::string, user_t*>      active_users;   // Current active users 
 
 } managed_data_t;

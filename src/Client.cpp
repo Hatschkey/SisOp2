@@ -62,14 +62,20 @@ void Client::setupConnection()
 
 void Client::handleUserInput()
 {
+    // Flush stdin so no empty message is sent
+    fflush(stdin);
+
     // Get user messages to be sent until Ctrl D is pressed
     std::string user_message;
     do
     {
+        
         std::cout << "Say something: ";
         try
         {
-            sendMessagePacket(user_message);
+            // Don't send empty messages
+            if (!user_message.empty())
+                sendMessagePacket(user_message);
         }
         catch(const std::runtime_error& e)
         {
