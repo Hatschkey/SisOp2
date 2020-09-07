@@ -80,12 +80,27 @@ void Server::listenConnections()
 
 void *Server::handleCommands(void* arg)
 {
+    // Available administrator commands
+    typedef void (*command_function)(void);
+    std::map<std::string,command_function> available_commands;
+    available_commands.insert(std::make_pair("list users", &listUsers));
+    available_commands.insert(std::make_pair("list groups", &listGroups));
+
     // Get administrator commands until Ctrl D is pressed
     std::string command;
     while(std::getline(std::cin, command))
     {
-        if (!command.compare("list"))
-            listUsers();
+        try
+        {
+            // Execute administrator command
+            available_commands.at(command)();
+            
+        }
+        catch(std::out_of_range& e)
+        {
+            std::cout << "Unknown command " << command << std::endl;
+        }
+
     }
 
     // TODO MUTEX Signal all other threads to end
@@ -145,8 +160,7 @@ void *Server::handleConnection(void* arg)
                     addUser(user);
                 }
                 else
-                {
-                    
+                {               
                     // If user was found, check for session count
                     if (user->active_sessions >= MAX_SESSIONS)
                     {
@@ -166,11 +180,25 @@ void *Server::handleConnection(void* arg)
                     user->active_sessions++;
                 }
 
-                // TODO Check if this group is currently active, and check for message history, for now assuming no
-                group = (group_t*)malloc(sizeof(group_t));
-                sprintf(group->groupname, "%s", login_payload_buffer->groupname);
+                // Check if this group is already active
+                // TODO This code should be moved into some sort of group manager
+                if ( (group = getGroup(login_payload_buffer->groupname)) == NULL)
+                {
+                    // If group was not found, create one
+                    group = (group_t*)malloc(sizeof(group_t));
+                    sprintf(group->groupname, "%s", login_payload_buffer->groupname);
+                    group->user_count = 0; 
 
-                // TODO Send the last N² group messages to the client
+                    // Add group to list
+                    addGroup(group);
+                }
+
+                // TODO Add this user as being part of this group
+
+                // Increase group user count
+                group->user_count++;
+
+                // TODO Check if there is a history file for this group, and show last N² messages to user if so
 
                 break;
             default:
@@ -182,7 +210,7 @@ void *Server::handleConnection(void* arg)
         for (int i=0; i < PACKET_MAX; i++) client_message[i] = '\0';
     }
 
-    // On client disconnect
+    // On client (normal) disconnect
     if (read_bytes == 0) 
     {
         std::cout << "[" << user->username << " @ " << group->groupname << "] disconnected" << std::endl;
@@ -191,7 +219,7 @@ void *Server::handleConnection(void* arg)
         user->active_sessions--;
         
         // If no active sessions for the user are left, free user space
-        if (user->active_sessions == 0)
+        if (user != NULL && user->active_sessions == 0)
         {
             // Remove user from list
             removeUser(user->username);
@@ -199,10 +227,22 @@ void *Server::handleConnection(void* arg)
             // Free user structure
             free(user);
         }
-    }
 
-    // TODO Check if this was last active user in group, and free group space
-    free(group);
+        // Decrease group user count
+        group->user_count--;
+
+        // TODO Remove user from group
+
+        // If no users are left in this group, free group space
+        if (group != NULL && group->user_count <= 0){
+            
+            // Remove group from list
+            removeGroup(group->groupname);
+
+            // Free group structure
+            free(group);
+        }
+    }
 
     // Free received argument pointer
     free(arg);
@@ -237,10 +277,12 @@ user_t* Server::getUser(std::string username)
 
     try
     {
+        // Try to find username in map
         return shared_data.active_users.at(username);
     }
     catch(const std::out_of_range& e)
     {
+        // If reached end of map, user is not there
         return NULL;
     }
         
@@ -248,7 +290,7 @@ user_t* Server::getUser(std::string username)
 
 void Server::addUser(user_t* user)
 {
-    // Insert user in list
+    // Insert user in map
     shared_data.active_users.insert(std::make_pair(user->username,user));
 }
 
@@ -268,4 +310,47 @@ void Server::listUsers()
         std::cout << "Last seen: " << i->second->last_seen << std::endl;
     }
     
+}
+
+group_t* Server::getGroup(std::string groupname)
+{
+    try
+    {
+        // Try to find groupname in map
+        return shared_data.active_groups.at(groupname);
+    }
+    catch(const std::out_of_range& e)
+    {
+        // If reached end of map, group is not there
+        return NULL;
+    }
+    
+}
+
+void Server::addGroup(group_t* group)
+{
+    // Insert in group map
+    shared_data.active_groups.insert(std::make_pair(group->groupname, group));
+}
+
+int Server::removeGroup(std::string groupname)
+{
+    // Get group from map
+    group_t* group = shared_data.active_groups.at(groupname);
+
+    // TODO Close open group history file
+
+    // Remove group from map
+    return shared_data.active_groups.erase(groupname);
+}
+
+void Server::listGroups()
+{
+    // Iterate map listing groups and their users
+    for (std::map<std::string,group_t*>::iterator i = shared_data.active_groups.begin(); i != shared_data.active_groups.end(); ++i)
+    {
+        std::cout << "Groupname: " << i->second->groupname << std::endl;
+        std::cout << "User count: " << i->second->user_count << std::endl;
+        // TODO Keep track of users inside groups
+    }
 }
