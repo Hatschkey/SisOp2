@@ -2,11 +2,6 @@
 
 #include "Server.h"
 
-/* Returns a reference to user if it is connected, NULL otherwise */
-user_t *user_connected(std::string username);
-/* Returns a reference to group if it is currently active, or creates group if it isn't */
-group_t *group_active(std::string groupname);
-
 /* Server entrypoint */
 int main(int argc, char** argv)
 {

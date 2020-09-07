@@ -141,6 +141,8 @@ void *Server::handleConnection(void* arg)
                 group = (group_t*)malloc(sizeof(group_t));
                 sprintf(group->groupname, "%s", login_payload_buffer->groupname);
 
+                // TODO Send the last N² group messages to the client
+
                 break;
             default:
                 std::cerr << "Unknown packet type received" << std::endl;

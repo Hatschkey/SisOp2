@@ -15,9 +15,9 @@ class Server
     private:
 
     /*
-        * Data shared between server threads
-        * TODO This should be MUTEX protected, as it is accessed concurrently by multiple threads
-        */
+    * Data shared between server threads
+    * TODO This should be MUTEX protected, as it is accessed concurrently by multiple threads
+    */
     static managed_data_t shared_data;
     int server_socket;  // Socket the server listens at for new incoming connections
     int client_socket;  // Socket the client connects from
