@@ -1,18 +1,25 @@
-all: User.o Group.o serverApp.o clientApp.o
-	g++ serverApp.o Server.o User.o Group.o -o ./bin/server -lpthread -Wall
-	g++ clientApp.o Client.o -o ./bin/client -lpthread -Wall
+CC = g++
+
+SRC_DIR := src/
+OBJ_DIR := obj/
+BIN_DIR := bin/
+INC_DIR := include/
+
+all: ${OBJ_DIR}User.o ${OBJ_DIR}Group.o ${OBJ_DIR}serverApp.o ${OBJ_DIR}clientApp.o
+	${CC} serverApp.o Server.o User.o Group.o -o ${BIN_DIR}server -lpthread -Wall
+	${CC} clientApp.o Client.o -o ${BIN_DIR}client -lpthread -Wall
 	
-serverApp.o: ./src/serverApp.cpp ./src/Server.cpp ./src/Server.h ./src/data_types.h ./src/constants.h
-	g++ -c ./src/serverApp.cpp ./src/Server.cpp ./src/Server.h ./src/data_types.h ./src/constants.h -Wall
+${OBJ_DIR}serverApp.o: ${SRC_DIR}serverApp.cpp ${SRC_DIR}Server.cpp ${INC_DIR}Server.h ${INC_DIR}data_types.h ${INC_DIR}constants.h
+	${CC} -c ${SRC_DIR}serverApp.cpp ${SRC_DIR}Server.cpp -I ${INC_DIR} -Wall
+	
+${OBJ_DIR}clientApp.o: ${SRC_DIR}clientApp.cpp ${SRC_DIR}Client.cpp ${INC_DIR}Client.h ${INC_DIR}data_types.h ${INC_DIR}constants.h
+	${CC} -c ${SRC_DIR}clientApp.cpp ${SRC_DIR}Client.cpp -I ${INC_DIR} -Wall
 
-clientApp.o: ./src/clientApp.cpp ./src/Client.cpp ./src/Client.h ./src/data_types.h ./src/constants.h
-	g++ -c ./src/clientApp.cpp ./src/Client.cpp ./src/Client.h ./src/data_types.h ./src/constants.h -Wall
+${OBJ_DIR}Group.o:
+	${CC} -c ${SRC_DIR}Group.cpp -I ${INC_DIR} -Wall
 
-Group.o:
-	g++ -c ./src/Group.cpp ./src/Group.h ./src/data_types.h ./src/constants.h -Wall
+${OBJ_DIR}User.o:
+	${CC} -c ${SRC_DIR}User.cpp -I ${INC_DIR} -Wall
 
-User.o:
-	g++ -c ./src/User.cpp ./src/User.h ./src/data_types.h ./src/constants.h -Wall	
-
-clean:
-	rm *.o ./src/*.gch ./bin/server ./bin/client ./bin/*.hist
+clean:	
+	rm *.o ${SRC_DIR}*.gch ${BIN_DIR}server ${BIN_DIR}client ${BIN_DIR}*.hist
