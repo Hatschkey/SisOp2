@@ -21,7 +21,7 @@ class Client
     std::string groupname;                  // Group the client wishes to join
     std::string server_ip;                  // IP of the remote server
     int         server_port;                // Port the remote server listens at
-    int         server_socket;              // Socket for remote server communication
+    static int  server_socket;              // Socket for remote server communication
     struct sockaddr_in server_address;      // Server socket address
 
     pthread_t server_listener_thread;       // Thread to listen for new incoming server messages

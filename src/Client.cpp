@@ -1,6 +1,7 @@
 #include "Client.h"
 
 std::atomic<bool> Client::stop_issued;
+int Client::server_socket;
 
 Client::Client(std::string username, std::string groupname, std::string server_ip, std::string server_port)
 {
@@ -94,9 +95,18 @@ void Client::handleUserInput()
 
 void *Client::getMessages(void* arg)
 {
+    int read_bytes = -1;
+    //char server_message[PACKET_MAX];
+
+    // TODO Wait for messages from the server
     while(!stop_issued)
     {
-       // TODO Listen to server messages
+
+    }
+    // If server closes connection
+    if (read_bytes == 0)
+    {
+        std::cout << "Connection closed by server" << std::endl;
     }
 
     pthread_exit(NULL);

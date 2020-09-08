@@ -22,4 +22,4 @@ ${OBJ_DIR}User.o:
 	${CC} -c ${SRC_DIR}User.cpp -I ${INC_DIR} -Wall
 
 clean:	
-	rm *.o ${SRC_DIR}*.gch ${BIN_DIR}server ${BIN_DIR}client ${BIN_DIR}*.hist
+	rm *.o ${INC_DIR}*.gch ${BIN_DIR}server ${BIN_DIR}client ${BIN_DIR}*.hist

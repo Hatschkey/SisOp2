@@ -1,8 +1,24 @@
 #include "Group.h"
 
-std::map<std::string, group_t*> Group::active_groups;
+std::map<std::string, Group*> Group::active_groups;
 
-group_t* Group::getGroup(std::string groupname)
+Group::Group(std::string groupname)
+{
+    // Update groupname
+    this->groupname = groupname;
+
+    // TODO Update eventual other variables
+
+    // Add itself to group list
+    Group::addGroup(this);
+}
+
+Group::~Group()
+{
+    // TODO Close any open group files
+}
+
+Group* Group::getGroup(std::string groupname)
 {
     try
     {
@@ -17,19 +33,15 @@ group_t* Group::getGroup(std::string groupname)
     
 }
 
-void Group::addGroup(group_t* group)
+void Group::addGroup(Group* group)
 {
     // Insert in group map
     active_groups.insert(std::make_pair(group->groupname, group));
+    
 }
 
 int Group::removeGroup(std::string groupname)
 {
-    // Get group from map
-    //group_t* group = active_groups.at(groupname);
-
-    // TODO Close open group history file
-
     // Remove group from map
     return active_groups.erase(groupname);
 }
@@ -37,11 +49,51 @@ int Group::removeGroup(std::string groupname)
 void Group::listGroups()
 {
     // Iterate map listing groups and their users
-    for (std::map<std::string,group_t*>::iterator i = active_groups.begin(); i != active_groups.end(); ++i)
+    for (std::map<std::string,Group*>::iterator i = active_groups.begin(); i != active_groups.end(); ++i)
     {
         std::cout << std::endl;
         std::cout << "Groupname: " << i->second->groupname << std::endl;
-        std::cout << "User count: " << i->second->user_count << std::endl;
-        // TODO Keep track of users inside groups
+        std::cout << "User count: " << i->second->getUserCount() << std::endl;
+        // List all users in the group
+        i->second->listUsers();
     }
+}
+
+void Group::addUser(User* user)
+{
+    // Insert user in map
+    users.insert(std::make_pair(user->username, user));
+}
+
+int Group::removeUser(std::string username)
+{
+    int removed_users = 0; // Amount of users that was removed
+
+    // Erase user from vector
+    removed_users = users.erase(username);
+
+    // Check how many users are left in the group
+    if (this->users.size() == 0)
+    {
+        // If no users are left, remove itself from the static list
+        Group::active_groups.erase(this->groupname);
+
+        // And delete itself
+        free(this);
+    }
+
+    return removed_users;
+}
+
+void Group::listUsers()
+{
+    // Iterate vector listing all users
+    for (std::map<std::string, User*>::iterator i = users.begin(); i != users.end(); ++i)
+        std::cout << "User: " << i->second->username << std::endl;
+
+}
+
+int Group::getUserCount()
+{
+    return users.size();
 }

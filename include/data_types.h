@@ -32,22 +32,4 @@ typedef struct __message_payload
 
 } message_payload;
 
-// Information about a user connected to the application
-typedef struct __user
-{
-    char username[21];          // User display name
-    uint16_t active_sessions;   // Current active session count (Must be less than MAX_SESSIONS)
-    uint16_t last_seen;         // Timestamp for last message received from this user
-    
-} user_t;
-
-// Information about a currently in-use group
-typedef struct __group
-{
-    char groupname[21];     // Group name
-    FILE* history;          // Group chat history file handle
-    int user_count;         // Current active user count in group
-
-} group_t;
-
 #endif

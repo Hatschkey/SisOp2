@@ -1,12 +1,27 @@
+#ifndef USER_H
+#define USER_H
+
 #include <string>
+#include <chrono>
+#include <vector>
+
+#include "constants.h"
 #include "data_types.h"
+#include "Group.h"
+
+// Forward declare Group
+class Group;
 
 class User
 {
 
     public:
 
-    static std::map<std::string, user_t*> active_users;   // Current active users 
+    static std::map<std::string, User*> active_users;   // Current active users 
+    
+    std::string username; // User display name
+    int last_seen; // Last time a message was received from this user
+    std::map<std::string, int> joined_groups; // Groups this user instance has joined and how many sessions are active in each group
 
     /**
      * Searches for the given username in the currently active users list. 
@@ -14,14 +29,14 @@ class User
      * @param username Username of the user to search for
      * @return Reference to the user structure in the user list
      */
-    static user_t* getUser(std::string username);
+    static User* getUser(std::string username);
 
     /**
      * Add user to currently active user list
      * TODO This method also should be read-write protected, only one user may be added at a time
      * @param user Pointer to user that will be added to list
      */
-    static void addUser(user_t* user);
+    static void addUser(User* user);
 
     /**
      * Remove specified user
@@ -35,4 +50,30 @@ class User
      */
     static void listUsers();
 
+    /**
+     * Class constructor
+     * @param username Display name for the user 
+     */
+    User(std::string username);
+
+    /**
+     * Returns the current session count for this user instance
+     * @return Amount of active user sessions
+     */
+    int getSessionCount();
+
+    /**
+     * Tries to join the given group, if the session count allows for it
+     * @param group Instance of a Group class
+     * @return 1 if join was successful, 0 if it wasn't
+     */
+    int joinGroup(Group* group);
+
+    /**
+     * Tries to leave the given group
+     * @param group Instance of the group the user wishes to leave 
+     */
+    void leaveGroup(Group* group);
 };
+
+#endif

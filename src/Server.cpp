@@ -3,6 +3,8 @@
 #include "Group.h"
 
 std::atomic<bool> Server::stop_issued;
+typedef void (*command_function)(void);
+std::map<std::string,command_function> Server::available_commands;
 
 Server::Server(int N)
 {
@@ -14,6 +16,11 @@ Server::Server(int N)
 
     // Initialize shared data
     stop_issued = 0;
+
+    // Initialize available server administrator commands
+    available_commands.insert(std::make_pair("list users", &User::listUsers));
+    available_commands.insert(std::make_pair("list groups", &Group::listGroups));
+    available_commands.insert(std::make_pair("help", &Server::listCommands));
 
     // Setup socket
     setupConnection();
@@ -36,9 +43,11 @@ void Server::listenConnections()
     // Spawn thread for listening to administrator commands
     pthread_create(&command_handler_thread, NULL, handleCommands, NULL);
 
-    // Wait for incoming connections
+    // Admin instructions
     std::cout << "Server is ready to receive connections" << std::endl;
-    
+    Server::listCommands();
+
+    // Wait for incoming connections
     // TODO Change from 'accept' to a non blocking method, so thread may be stopped safely
     int sockaddr_size = sizeof(struct sockaddr_in);
     int* new_socket;
@@ -80,14 +89,18 @@ void Server::listenConnections()
 
 }
 
+void Server::listCommands()
+{
+    // Iterate map listing commands
+    std::cout << "Available commands are: " << std::endl;
+    for (std::map<std::string,command_function>::iterator i = Server::available_commands.begin(); i != Server::available_commands.end(); ++i)
+    {
+        std::cout << " " << i->first << std::endl;
+    }
+}
+
 void *Server::handleCommands(void* arg)
 {
-    // Available administrator commands
-    typedef void (*command_function)(void);
-    std::map<std::string,command_function> available_commands;
-    available_commands.insert(std::make_pair("list users", &User::listUsers));
-    available_commands.insert(std::make_pair("list groups", &Group::listGroups));
-
     // Get administrator commands until Ctrl D is pressed
     std::string command;
     while(std::getline(std::cin, command))
@@ -105,7 +118,7 @@ void *Server::handleCommands(void* arg)
 
     }
 
-    // TODO MUTEX Signal all other threads to end
+    // Signal all other threads to end
     stop_issued = true;
 
     pthread_exit(NULL);
@@ -120,10 +133,8 @@ void *Server::handleConnection(void* arg)
     login_payload* login_payload_buffer;        // Buffer for client login information
     std::string    message;                     // User chat message
 
-    user_t* user   = NULL; // User the client is connected as
-    group_t* group = NULL; // Group the client is connected to
- 
-    std::cout << "Created new connection handler for the client " << socket << std::endl;
+    User* user   = NULL; // User the client is connected as
+    Group* group = NULL; // Group the client is connected to
 
     while((read_bytes = recv(socket, client_message, PACKET_MAX, 0)) > 0)
     {
@@ -149,58 +160,36 @@ void *Server::handleConnection(void* arg)
                 // TODO Debug messages
                 std::cout << "Received login packet from " << login_payload_buffer->username << " @ " << login_payload_buffer-> groupname << std::endl;
 
-                // Check if this user is logged in already
-                if ( (user = User::getUser(login_payload_buffer->username)) == NULL)
-                {
-                    // If user was not found, create a new one
-                    user = (user_t*)malloc(sizeof(user_t));
-                    user->active_sessions = 1;
-                    user->last_seen = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-                    sprintf(user->username, "%s", login_payload_buffer->username);
+                // Check if this group is already active, and create one if not
+                if ( (group = Group::getGroup(login_payload_buffer->groupname)) == NULL)
+                    group = new Group(login_payload_buffer->groupname);
 
-                    // Add new user to list
-                    User::addUser(user);
+                // Check if this user is logged in already, and create one if not
+                if ( (user = User::getUser(login_payload_buffer->username)) == NULL)
+                    user = new User(login_payload_buffer->username);
+
+                // Try to join that group with this user
+                if (user->joinGroup(group))
+                {
+                    // TODO If user was able to join group, show messages
+                    // TODO Not sure if that code goes here or in Group methods
                 }
                 else
-                {               
-                    // If user was found, check for session count
-                    if (user->active_sessions >= MAX_SESSIONS)
-                    {
-                        // Reject connection
-                        close(socket);
-
-                        // TODO Send message to client informing connection was rejected
-
-                        // Free received argument pointer
-                        free(arg);
-
-                        // Exit
-                        pthread_exit(NULL);
-                    }
-                    
-                    // Increase user session count
-                    user->active_sessions++;
-                }
-
-                // Check if this group is already active
-                // TODO This code should be moved into some sort of group manager
-                if ( (group = Group::getGroup(login_payload_buffer->groupname)) == NULL)
                 {
-                    // If group was not found, create one
-                    group = (group_t*)malloc(sizeof(group_t));
-                    sprintf(group->groupname, "%s", login_payload_buffer->groupname);
-                    group->user_count = 0; 
+                    // If user was not able to join group, refuse connection
 
-                    // Add group to list
-                    Group::addGroup(group);
+                    // TODO Send message to client informing max of MAX_SESSIONS sessions
+                    std::cout << "Connection was refused due to exceding MAX_SESSIONS: " << MAX_SESSIONS << std::endl;
+
+                    // Reject connection
+                    close(socket);
+
+                    // Free received argument pointer
+                    free(arg);
+
+                    // Exit
+                    pthread_exit(NULL);
                 }
-
-                // TODO Add this user as being part of this group
-
-                // Increase group user count
-                group->user_count++;
-
-                // TODO Check if there is a history file for this group, and show last N² messages to user if so
 
                 break;
             default:
@@ -212,43 +201,16 @@ void *Server::handleConnection(void* arg)
         for (int i=0; i < PACKET_MAX; i++) client_message[i] = '\0';
     }
 
-    // On client (normal) disconnect
-    if (read_bytes == 0) 
-    {
-        std::cout << "[" << user->username << " @ " << group->groupname << "] disconnected" << std::endl;
+    // Debug message
+    std::cout << "[" << user->username << " @ " << group->groupname << "] disconnected" << std::endl;
 
-        // Decrease user active session count
-        user->active_sessions--;
-        
-        // If no active sessions for the user are left, free user space
-        if (user != NULL && user->active_sessions == 0)
-        {
-            // Remove user from list
-            User::removeUser(user->username);
-
-            // Free user structure
-            free(user);
-        }
-
-        // Decrease group user count
-        group->user_count--;
-
-        // TODO Remove user from group
-
-        // If no users are left in this group, free group space
-        if (group != NULL && group->user_count <= 0){
-            
-            // Remove group from list
-            Group::removeGroup(group->groupname);
-
-            // Free group structure
-            free(group);
-        }
-    }
+    // Leave group with this user
+    user->leaveGroup(group);
 
     // Free received argument pointer
     free(arg);
 
+    // Exit
     pthread_exit(NULL);
 }
 
@@ -272,4 +234,31 @@ void Server::setupConnection()
     if ( bind(server_socket, (struct sockaddr *)&server_address, sizeof(server_address)) < 0)
         throw std::runtime_error("Error during socket bind");
     
+}
+
+int Server::sendPacket(int socket, int packet_type, char* payload, int payload_size)
+{
+    int packet_size = -1;  // Size of packet to be sent
+    int bytes_sent = -1;   // Number of bytes sent to the client
+
+    // Prepare packet
+    packet* data = (packet*)malloc(sizeof(*data) + sizeof(char) * payload_size);
+    data->type      = PAK_CMD; // Signal that a data packet is being sent
+    data->sqn       = 1; // TODO Keep track of the packet sequence numbers
+    data->timestamp = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()); // Current timestamp
+    data->length = payload_size;    // Update payload size
+    memcpy((char*)data->_payload, payload, payload_size); // Copy payload to packet
+
+    // Calculate packet size
+    packet_size = sizeof(*data) + (sizeof(char) * payload_size);
+
+    // Send packet
+    if ( (bytes_sent = send(socket, data, packet_size, 0)) <= 0)
+        throw std::runtime_error("Unable to send message to server");
+
+    // Free memory used for packet
+    free(data);
+
+    // Return number of bytes sent
+    return bytes_sent;
 }

@@ -16,6 +16,8 @@ class Server
     // Private attributes
     private:
 
+    typedef void (*command_function)(void);
+    static std::map<std::string,command_function> available_commands; // All available administrator commands
 
     static std::atomic<bool> stop_issued; // Atomic thread for stopping all threads
     int server_socket;  // Socket the server listens at for new incoming connections
@@ -48,6 +50,19 @@ class Server
      */
     void listenConnections();
 
+    // Private methods
+    private:
+    
+    /**
+     * Lists all available administrator commands to stdout
+     */
+    static void listCommands();
+
+    /**
+     * Sets up the server socket to begin for listening
+     */
+    void setupConnection();
+
     /**
      * Handle server administrator commands
      * This should run in a separate thread to the main server thread
@@ -60,11 +75,14 @@ class Server
      */
     static void *handleConnection(void* arg);
 
-    // Private methods
-    private:
-
     /**
-     * Sets up the server socket to begin for listening
+     * Sends a packet with given payload to the provided socket descriptor
+     * @param socket Socket descriptor where the packet will be sent
+     * @param packet_type Type of packet that should be sent (see constants.h)
+     * @param payload Data that will be sent through that socket
+     * @param payload_size Size of the data provided in payload
+     * @returns Number of bytes sent
      */
-    void setupConnection();
+    static int sendPacket(int socket, int packet_type, char* payload, int payload_size);
+
 };
