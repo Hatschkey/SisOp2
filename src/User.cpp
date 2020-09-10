@@ -120,3 +120,15 @@ void User::leaveGroup(Group* group)
     }
 }
 
+int User::say(std::string message, std::string groupname)
+{
+    // Fetch the group
+    Group* group = Group::getGroup(groupname);
+
+    // "Posts" a message to group, along with sender username
+    if (group != NULL)
+        return group->post(message, this->username);
+
+    return 0;
+}
+

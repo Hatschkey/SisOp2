@@ -2,6 +2,7 @@
 #define GROUP_H
 
 #include <map>
+#include <string.h>
 
 #include "constants.h"
 #include "data_types.h"
@@ -17,8 +18,9 @@ class Group
 
     static std::map<std::string, Group*> active_groups;  // Current active groups 
 
-    std::string groupname;      // Name for this group instance
-    std::map<std::string, User*> users;   // Map of references to users connected to this group
+    std::string groupname;                  // Name for this group instance
+    std::map<std::string, User*> users;     // Map of references to users connected to this group
+    FILE* history_file;                     // File descriptor for this group's history file
 
     // These static methods are related to the list of all groups (static active_groups)
     /**
@@ -82,6 +84,15 @@ class Group
      * @returns Current user count
      */
     int getUserCount();
+
+    /**
+     * "Posts" a chat message in this group
+     * Saves the message in the group's history file and notifies all group members, including sender
+     * @param message  Message that is being posted in the group
+     * @param username Who sent this message
+     * @return Number of users this message was sent to, should always be at least 1 (the sender) on success
+     */
+    int post(std::string message, std::string username);
 };
 
 #endif

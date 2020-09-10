@@ -74,6 +74,14 @@ class User
      * @param group Instance of the group the user wishes to leave 
      */
     void leaveGroup(Group* group);
+
+    /**
+     * Sends a message said by this user to the group
+     * @param message   Chat message this user wants to say
+     * @param groupname Name of the group this message is being sent to
+     * @return Number of users this message was sent to, should always be at least 1 (the sender) on success
+     */
+    int say(std::string message, std::string groupname);
 };
 
 #endif

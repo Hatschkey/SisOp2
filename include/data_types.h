@@ -23,13 +23,14 @@ typedef struct __login_payload
 
 } login_payload;
 
-/**
- * Payload for a client message
- * TODO Currently not used
- */
-typedef struct __message_payload
+// Struct for recording a chat message, for storage in the history file
+typedef struct __message_record
 {
+    char username[21];      // User who sent this message
+    uint16_t timestamp;     // Message timestamp for ordering purposes
+    uint16_t length;        // Message length
+    const char _message[];  // What the user said
 
-} message_payload;
+} message_record;
 
 #endif

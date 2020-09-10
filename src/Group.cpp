@@ -7,7 +7,8 @@ Group::Group(std::string groupname)
     // Update groupname
     this->groupname = groupname;
 
-    // TODO Update eventual other variables
+    // Try to open group history file (groupname.hist)
+    this->history_file = fopen(groupname.append(".hist").c_str(),"ab+");
 
     // Add itself to group list
     Group::addGroup(this);
@@ -15,7 +16,8 @@ Group::Group(std::string groupname)
 
 Group::~Group()
 {
-    // TODO Close any open group files
+    // Close group history file
+    fclose(this->history_file);
 }
 
 Group* Group::getGroup(std::string groupname)
@@ -95,5 +97,34 @@ void Group::listUsers()
 
 int Group::getUserCount()
 {
+    return users.size();
+}
+
+int Group::post(std::string message, std::string username)
+{
+    // Create a record for the user message
+    message_record* msg = (message_record*)malloc(sizeof(message_record));
+    sprintf(msg->username,"%s", username.c_str());  // Copy username
+    msg->timestamp = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()); // Current timestamp
+    msg->length = strlen(message.c_str()) + 1; // Update message length
+    sprintf((char*)msg->_message,"%s",message.c_str()); // Copy message
+
+    // Calculate struct size
+    int record_size = sizeof(*msg) + sizeof(char) * strlen(message.c_str());
+
+    // Write message in group history file
+    fwrite((void*)msg, record_size, 1, history_file);
+
+    // Send message to every connected user (Including message sender)
+    for (std::map<std::string, User*>::iterator i = users.begin(); i != users.end(); ++i)
+    {
+        // TODO Placeholder debug message
+        std::cout << "TODO Send message to " << i->second->username << std::endl;
+    }
+
+    // Free memory used for message record
+    free(msg);
+
+    // TODO Change here to return the amount of messages that were issued
     return users.size();
 }

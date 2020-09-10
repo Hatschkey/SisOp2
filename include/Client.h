@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <iostream>
 #include <atomic>
+#include <pthread.h>
 
 #include "constants.h"
 #include "data_types.h"

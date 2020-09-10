@@ -148,8 +148,12 @@ void *Server::handleConnection(void* arg)
         {
             case PAK_DAT:   // Data packet
 
-                // TODO inform message and group threads, the below code is only for debug purposes
+                // Debug
                 std::cout << "[" << user->username << " @ " << group->groupname << "] says: " << received_packet->_payload << std::endl;
+                
+                // Say the message to the group
+                if (user != NULL && group != NULL)
+                    user->say(received_packet->_payload, group->groupname);
 
                 break;
             case PAK_CMD:   // Command packet (login)

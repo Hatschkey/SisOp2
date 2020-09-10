@@ -7,6 +7,7 @@
 #include <chrono>
 #include <vector>
 #include <atomic>
+#include <pthread.h>
 
 #include "data_types.h"
 #include "constants.h"
