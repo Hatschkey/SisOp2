@@ -80,6 +80,9 @@ int Group::removeUser(std::string username)
         // If no users are left, remove itself from the static list
         Group::active_groups.erase(this->groupname);
 
+        // Call desctructor
+        this->~Group();
+
         // And delete itself
         free(this);
     }
