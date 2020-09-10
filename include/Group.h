@@ -3,6 +3,7 @@
 
 #include <map>
 #include <string.h>
+#include <unistd.h>
 
 #include "constants.h"
 #include "data_types.h"
@@ -87,12 +88,29 @@ class Group
 
     /**
      * "Posts" a chat message in this group
-     * Saves the message in the group's history file and notifies all group members, including sender
+     * Saves the message and notifies all group members, including sender
      * @param message  Message that is being posted in the group
      * @param username Who sent this message
      * @return Number of users this message was sent to, should always be at least 1 (the sender) on success
      */
     int post(std::string message, std::string username);
+
+    /**
+     * Creates and saves the given message to this groups history file. 
+     * TODO This method should be mutex protected (No other threads should read or write to the file concurrently)
+     * @param message  Message that will be saved
+     * @param username User who sent this message
+     */
+    void saveMessage(std::string message, std::string username);
+
+    /**
+     * Recovers the last N messages from the group's history file, sending them to the user
+     * @param n    Number of messages that will be recovered
+     * @param user Pointer to the user instance that will receive these messages
+     * @return Number of messages recovered from the file
+     */
+    int recoverHistory(int n, User* user);
+
 };
 
 #endif

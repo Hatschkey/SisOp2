@@ -5,6 +5,7 @@
 std::atomic<bool> Server::stop_issued;
 typedef void (*command_function)(void);
 std::map<std::string,command_function> Server::available_commands;
+int Server::message_history;
 
 Server::Server(int N)
 {
@@ -175,8 +176,8 @@ void *Server::handleConnection(void* arg)
                 // Try to join that group with this user
                 if (user->joinGroup(group))
                 {
-                    // TODO If user was able to join group, show messages
-                    // TODO Not sure if that code goes here or in Group methods
+                    // Recover message history for this user
+                    group->recoverHistory(Server::message_history, user);
                 }
                 else
                 {

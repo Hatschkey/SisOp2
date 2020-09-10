@@ -8,6 +8,7 @@
 #include <vector>
 #include <atomic>
 #include <pthread.h>
+#include <cmath>
 
 #include "data_types.h"
 #include "constants.h"
@@ -25,7 +26,7 @@ class Server
     int client_socket;  // Socket the client connects from
     struct sockaddr_in server_address;  // Server socket address
     struct sockaddr_in client_address;  // Client socket address
-    int message_history;    // Amount of old group messages to show clients
+    static int message_history;    // Amount of old group messages to show clients
 
     pthread_t command_handler_thread; // Thread for handling server
     std::vector<pthread_t> connection_handler_threads; // Threads for handling client connections
