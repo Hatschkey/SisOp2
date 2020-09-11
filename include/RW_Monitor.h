@@ -1,3 +1,6 @@
+#ifndef RW_MONITOR_H
+#define RW_MONITOR_H
+
 #include <condition_variable>
 #include <mutex>
 #include <iostream>
@@ -38,3 +41,5 @@ class RW_Monitor
      */
     void releaseWrite();
 };
+
+#endif

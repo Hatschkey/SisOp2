@@ -196,12 +196,18 @@ int Group::post(std::string message, std::string username)
     // Save this message
     this->saveMessage(message, username);
 
+    // Request read rights
+    users_monitor.requestRead();
+
     // Send message to every connected user (Including message sender)
     for (std::map<std::string, User*>::iterator i = users.begin(); i != users.end(); ++i)
     {
         // TODO Placeholder debug message
         std::cout << "TODO Send message to " << i->second->username << std::endl;
     }
+
+    // Release read rights
+    users_monitor.releaseRead();
 
     // TODO Change here to return the amount of messages that were issued
     return users.size();

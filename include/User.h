@@ -8,6 +8,7 @@
 #include "constants.h"
 #include "data_types.h"
 #include "Group.h"
+#include "RW_Monitor.h"
 
 // Forward declare Group
 class Group;
@@ -18,10 +19,12 @@ class User
     public:
 
     static std::map<std::string, User*> active_users;   // Current active users 
+    static RW_Monitor active_users_monitor; // Monitor for active users
     
     std::string username; // User display name
     int last_seen; // Last time a message was received from this user
     std::map<std::string, int> joined_groups; // Groups this user instance has joined and how many sessions are active in each group
+    RW_Monitor joined_groups_monitor;   // Monitor for joined groups
 
     /**
      * Searches for the given username in the currently active users list. 

@@ -1,37 +1,61 @@
 #include "User.h"
 
 std::map<std::string, User*> User::active_users;
+RW_Monitor User::active_users_monitor;
 
 User* User::getUser(std::string username)
 {
+    User* user; // Reference to the user
 
     try
     {
+        // Request read rights
+        active_users_monitor.requestRead();
+
         // Try to find username in map
-        return active_users.at(username);
+        user = active_users.at(username);
     }
     catch(const std::out_of_range& e)
     {
         // If reached end of map, user is not there
-        return NULL;
+        user = NULL;
     }
         
+    // Release read rights
+    active_users_monitor.releaseRead();
+
+    return user;
 };
 
 void User::addUser(User* user)
 {
+    // Request write rights
+    active_users_monitor.requestWrite();
+
     // Insert user in map
     active_users.insert(std::make_pair(user->username,user));
+
+    // Release write rights
+    active_users_monitor.releaseWrite();
 }
 
 int User::removeUser(std::string username)
 {
+    // Request write rights
+    active_users_monitor.requestWrite();
+
     // Remove user from map
     return active_users.erase(username);
+
+    // Release write rights
+    active_users_monitor.releaseWrite();
 }
 
 void User::listUsers()
 {
+    // Request read rights
+    active_users_monitor.requestRead();
+
     // Iterate map listing users
     for (std::map<std::string,User*>::iterator i = active_users.begin(); i != active_users.end(); ++i)
     {
@@ -41,6 +65,8 @@ void User::listUsers()
         std::cout << "Last seen: " << i->second->last_seen << std::endl;
     }
     
+    // Release read rights
+    active_users_monitor.releaseRead();
 }
 
 User::User(std::string username)
@@ -51,17 +77,24 @@ User::User(std::string username)
 
     // Add itself to the active user list
     User::addUser(this);
+
 }
 
 int User::getSessionCount()
 {
     int total_sessions = 0; // Total sessions the user has at the moment
 
+    // Request read rights
+    joined_groups_monitor.requestRead();
+
     // Iterate map summing all user sessions
     for (std::map<std::string,int>::iterator i = this->joined_groups.begin(); i != this->joined_groups.end(); ++i)
     {
         total_sessions += i->second;
     }
+
+    // Release read rights
+    joined_groups_monitor.releaseRead();
 
     return total_sessions;
 }
@@ -73,6 +106,9 @@ int User::joinGroup(Group* group)
     {
         // Add user to group
         group->addUser(this);
+
+        // Request write rights
+        joined_groups_monitor.requestWrite();
 
         // Check if this user is already connected to this group
         if (this->joined_groups.find(group->groupname) == this->joined_groups.end()) 
@@ -86,6 +122,9 @@ int User::joinGroup(Group* group)
             this->joined_groups.at(group->groupname)++;
         }
 
+        // Release write rights
+        joined_groups_monitor.releaseWrite();
+
         // Return sucessful join
         return 1;
     }
@@ -96,6 +135,9 @@ int User::joinGroup(Group* group)
 
 void User::leaveGroup(Group* group)
 {
+    // Request write rights
+    joined_groups_monitor.requestWrite();
+
     // Remove the group from this user's group list
     this->joined_groups.at(group->groupname)--;
 
@@ -111,13 +153,31 @@ void User::leaveGroup(Group* group)
         // Check if this was the last session for the user
         if (this->joined_groups.empty())
         {
+            // Request write rights
+            active_users_monitor.requestWrite();
+
             // Remove user from static user list
             User::active_users.erase(this->username);
+
+            // Release write rights
+            active_users_monitor.releaseWrite();
+            joined_groups_monitor.releaseWrite();
 
             // And delete itself
             free(this);
         }
+        else
+        {
+            // Release write rights
+            joined_groups_monitor.releaseWrite();
+        }
+        
     }
+    else
+    {
+        // Release write rights
+        joined_groups_monitor.releaseWrite();
+    }  
 }
 
 int User::say(std::string message, std::string groupname)
