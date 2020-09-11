@@ -25,6 +25,7 @@ class Group
     std::map<std::string, User*> users;     // Map of references to users connected to this group
     RW_Monitor users_monitor;               // Monitor for this instance's user list
     FILE* history_file;                     // File descriptor for this group's history file
+    RW_Monitor history_file_monitor;        // Monitor for acessing the group history file
 
     // These static methods are related to the list of all groups (static active_groups)
     /**

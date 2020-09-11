@@ -13,6 +13,9 @@ Group::Group(std::string groupname)
     // Name of the group's history file
     std::string history_filename = groupname.append(".hist");
  
+    // Request write rights
+    history_file_monitor.requestWrite();
+
     // Check if it already existed
     if ( (this->history_file = fopen(history_filename.c_str(),"rb+")) == NULL)
     {
@@ -27,14 +30,24 @@ Group::Group(std::string groupname)
     // Flush file
     fflush(this->history_file);
 
+    // Release write rights
+    history_file_monitor.releaseWrite();
+
     // Add itself to group list
     Group::addGroup(this);
 }
 
 Group::~Group()
 {
+    
+    // Request write rights
+    history_file_monitor.releaseWrite();
+
     // Close group history file
     fclose(this->history_file);
+
+    // Release write rights
+    history_file_monitor.releaseWrite();
 }
 
 Group* Group::getGroup(std::string groupname)
@@ -125,7 +138,7 @@ void Group::addUser(User* user)
 
 int Group::removeUser(std::string username)
 {
-    int removed_users = 0; // Amount of users that was removed
+    int removed_users = 0;  // Amount of users that was removed
 
     // Request write rights
     this->users_monitor.requestWrite();
@@ -137,7 +150,7 @@ int Group::removeUser(std::string username)
     this->users_monitor.releaseWrite();
 
     // Check how many users are left in the group
-    if (this->users.size() == 0)
+    if (this->getUserCount() == 0)
     {
         // If no users are left, remove itself from the static list
 
@@ -162,7 +175,6 @@ int Group::removeUser(std::string username)
 
 void Group::listUsers()
 {
-
     // Request read rights
     this->users_monitor.requestRead();
 
@@ -210,7 +222,7 @@ int Group::post(std::string message, std::string username)
     users_monitor.releaseRead();
 
     // TODO Change here to return the amount of messages that were issued
-    return users.size();
+    return this->getUserCount();
 }
 
 void Group::saveMessage(std::string message, std::string username)
@@ -225,7 +237,9 @@ void Group::saveMessage(std::string message, std::string username)
     // Calculate struct size
     int record_size = sizeof(*msg) + sizeof(char) * (strlen(message.c_str()) + 1);
 
-    // TODO Mutex protect this writing process
+    // Request writing rights
+    history_file_monitor.requestWrite();
+
     // Write message at the end of group history file
     fseek(this->history_file, 0, SEEK_END);
     fwrite(msg, record_size, 1, this->history_file);
@@ -244,6 +258,9 @@ void Group::saveMessage(std::string message, std::string username)
     // Update file
     fflush(this->history_file);
 
+    // Release writing rights
+    history_file_monitor.releaseWrite();
+
     // Free memory used for message record
     free(msg);
 }
@@ -255,6 +272,9 @@ int Group::recoverHistory(int n, User* user)
     long total_messages = 0;  // Total number of messages in the file
     long current_message = 0; // Currently indexed message in the file
     int read_messages = 0; // Number of messages that were read and sent to user
+
+    // Request reading rights
+    history_file_monitor.requestRead();
 
     // Open history file for reading
     FILE* hist = fopen(std::string(this->groupname + ".hist").c_str(), "rb");
@@ -292,6 +312,9 @@ int Group::recoverHistory(int n, User* user)
 
     // Close file that was opened for reading
     fclose(hist);
+
+    // Release reading rights
+    history_file_monitor.releaseRead();
 
     // Return read messages
     return read_messages;
