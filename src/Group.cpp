@@ -1,6 +1,7 @@
 #include "Group.h"
 
 std::map<std::string, Group*> Group::active_groups;
+RW_Monitor Group::active_groups_monitor;
 
 Group::Group(std::string groupname)
 {
@@ -38,34 +39,64 @@ Group::~Group()
 
 Group* Group::getGroup(std::string groupname)
 {
+    Group* group; // Reference to the group
+
     try
     {
+        // Request read rights
+        Group::active_groups_monitor.requestRead();
+
         // Try to find groupname in map
-        return active_groups.at(groupname);
+        group = active_groups.at(groupname);
+
     }
     catch(const std::out_of_range& e)
     {
         // If reached end of map, group is not there
-        return NULL;
+        group = NULL;
     }
     
+    // Release read rights
+    Group::active_groups_monitor.releaseRead();
+
+    return group;
 }
 
 void Group::addGroup(Group* group)
 {
+    // Request write rights
+    Group::active_groups_monitor.requestWrite();
+
     // Insert in group map
     active_groups.insert(std::make_pair(group->groupname, group));
     
+    // Release the write rights
+    Group::active_groups_monitor.releaseWrite();
+
 }
 
 int Group::removeGroup(std::string groupname)
 {
+    int removed_groups = 0; // Number of removed groups
+
+    // Request write rights
+    Group::active_groups_monitor.requestWrite();
+
     // Remove group from map
-    return active_groups.erase(groupname);
+    removed_groups = active_groups.erase(groupname);
+
+    // Release write rights
+    Group::active_groups_monitor.releaseWrite();
+
+    return removed_groups;
 }
 
 void Group::listGroups()
 {
+
+    // Request read rights
+    Group::active_groups_monitor.requestRead();
+
     // Iterate map listing groups and their users
     for (std::map<std::string,Group*>::iterator i = active_groups.begin(); i != active_groups.end(); ++i)
     {
@@ -75,26 +106,49 @@ void Group::listGroups()
         // List all users in the group
         i->second->listUsers();
     }
+
+    // Release read rights
+    Group::active_groups_monitor.releaseRead();
 }
 
 void Group::addUser(User* user)
 {
+    // Request write rights
+    this->users_monitor.requestWrite();
+
     // Insert user in map
     users.insert(std::make_pair(user->username, user));
+
+    // Release write rights
+    this->users_monitor.releaseWrite();
 }
 
 int Group::removeUser(std::string username)
 {
     int removed_users = 0; // Amount of users that was removed
 
+    // Request write rights
+    this->users_monitor.requestWrite();
+
     // Erase user from vector
     removed_users = users.erase(username);
+
+    // Release write rights
+    this->users_monitor.releaseWrite();
 
     // Check how many users are left in the group
     if (this->users.size() == 0)
     {
         // If no users are left, remove itself from the static list
+
+        // Request write rights
+        Group::active_groups_monitor.requestWrite();
+
+        // Remove itself from the static list
         Group::active_groups.erase(this->groupname);
+
+        // Release write rights
+        Group::active_groups_monitor.releaseWrite();
 
         // Call desctructor
         this->~Group();
@@ -108,15 +162,32 @@ int Group::removeUser(std::string username)
 
 void Group::listUsers()
 {
+
+    // Request read rights
+    this->users_monitor.requestRead();
+
     // Iterate vector listing all users
     for (std::map<std::string, User*>::iterator i = users.begin(); i != users.end(); ++i)
         std::cout << "User: " << i->second->username << std::endl;
+
+    // Release read rights
+    this->users_monitor.releaseRead();
 
 }
 
 int Group::getUserCount()
 {
-    return users.size();
+    int user_count = 0; // Current connected user count
+
+    // Request read rights
+    this->users_monitor.requestRead();
+
+    user_count = users.size();
+
+    // Release read rights
+    this->users_monitor.releaseRead();
+
+    return user_count;
 }
 
 int Group::post(std::string message, std::string username)

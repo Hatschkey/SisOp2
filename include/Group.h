@@ -8,6 +8,7 @@
 #include "constants.h"
 #include "data_types.h"
 #include "User.h"
+#include "RW_Monitor.h"
 
 // Forward declare User
 class User;
@@ -18,9 +19,11 @@ class Group
     public: 
 
     static std::map<std::string, Group*> active_groups;  // Current active groups 
+    static RW_Monitor active_groups_monitor;             // Monitor for the group list variable
 
     std::string groupname;                  // Name for this group instance
     std::map<std::string, User*> users;     // Map of references to users connected to this group
+    RW_Monitor users_monitor;               // Monitor for this instance's user list
     FILE* history_file;                     // File descriptor for this group's history file
 
     // These static methods are related to the list of all groups (static active_groups)
