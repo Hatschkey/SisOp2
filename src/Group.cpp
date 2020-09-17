@@ -202,15 +202,15 @@ int Group::getUserCount()
     return user_count;
 }
 
-int Group::post(std::string message, std::string username)
+int Group::post(std::string& message, std::string username)
 {
 
     // Save this message
     this->saveMessage(message, username);
-
+    
     // Request read rights
     users_monitor.requestRead();
-
+    
     // Send message to every connected user (Including message sender)
     for (std::map<std::string, User*>::iterator i = users.begin(); i != users.end(); ++i)
     {
@@ -228,7 +228,7 @@ int Group::post(std::string message, std::string username)
 void Group::saveMessage(std::string message, std::string username)
 {
     // Create a record for the user message
-    message_record* msg = (message_record*)malloc(sizeof(message_record));
+    message_record* msg = (message_record*)malloc(sizeof(*msg) + sizeof(char)*(strlen(message.c_str()) + 1));
     sprintf(msg->username,"%s", username.c_str());  // Copy username
     msg->timestamp = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()); // Current timestamp
     msg->length = strlen(message.c_str()) + 1; // Update message length
@@ -250,7 +250,7 @@ void Group::saveMessage(std::string message, std::string username)
     fread(&message_counter,sizeof(long), 1,history_file);
     message_counter++;
     fseek(this->history_file, 0, SEEK_SET);
-    fwrite(&message_counter, sizeof(message_counter), 1, history_file);
+    fwrite(&message_counter, sizeof(long), 1, history_file);
 
     // Move pointer back to the end of the file
     fseek(this->history_file, 0, SEEK_END);
@@ -283,7 +283,7 @@ int Group::recoverHistory(int n, User* user)
     fread(&total_messages, sizeof(long), 1, hist);
 
     // TODO Debug message
-    std::cout << "Group history file has " << total_messages << " messages" << std::endl;
+    //std::cout << "Group history file has " << total_messages << " messages" << std::endl;
 
     // Iterate through history file reading headers
     while (current_message < total_messages && fread(header_buffer, sizeof(message_record), 1, hist) > 0)
@@ -295,7 +295,7 @@ int Group::recoverHistory(int n, User* user)
             fread(message_buffer,((message_record*)header_buffer)->length, 1, hist);
 
             // TODO Placeholder send message to user
-            std::cout << "TODO Send message \"" << message_buffer << "\" by " << ((message_record*)header_buffer)->username << " to user " << user->username << std::endl;
+            //std::cout << "TODO Send message \"" << message_buffer << "\" by " << ((message_record*)header_buffer)->username << " to user " << user->username << std::endl;
 
             // Increase read message counter
             read_messages++;

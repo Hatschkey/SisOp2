@@ -97,7 +97,7 @@ class Group
      * @param username Who sent this message
      * @return Number of users this message was sent to, should always be at least 1 (the sender) on success
      */
-    int post(std::string message, std::string username);
+    int post(std::string& message, std::string username);
 
     /**
      * Creates and saves the given message to this groups history file. 
