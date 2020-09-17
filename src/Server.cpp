@@ -7,6 +7,9 @@ typedef void (*command_function)(void);
 std::map<std::string,command_function> Server::available_commands;
 int Server::message_history;
 
+std::map<int, pthread_t> Server::connection_handler_threads;
+RW_Monitor Server::threads_monitor;
+
 Server::Server(int N)
 {
     // Validate N
@@ -21,8 +24,9 @@ Server::Server(int N)
     // Initialize available server administrator commands
     available_commands.insert(std::make_pair("list users", &User::listUsers));
     available_commands.insert(std::make_pair("list groups", &Group::listGroups));
+    available_commands.insert(std::make_pair("list threads",&Server::listThreads));
     available_commands.insert(std::make_pair("help", &Server::listCommands));
-
+    
     // Setup socket
     setupConnection();
 }
@@ -31,12 +35,12 @@ Server::~Server()
 {
     // Close opened sockets
     close(server_socket);
-    close(client_socket);
-
+    //close(client_socket);
 }
 
 void Server::listenConnections()
 {
+    int client_socket = -1;
     // Set passive listen socket
     if ( listen(server_socket, 3) < 0)
         throw std::runtime_error("Error setting socket as passive listener");
@@ -54,13 +58,13 @@ void Server::listenConnections()
     int* new_socket;
     while(!stop_issued && (client_socket = accept(server_socket, (struct sockaddr*)&client_address, (socklen_t*)&sockaddr_size)) )
     {
-        std::cout << "New connection accepted from client " << client_socket << std::endl;
+        //std::cout << "New connection accepted from client " << client_socket << std::endl;
         
         // Start new thread for new connection
         pthread_t comm_thread;
         
         // Get reference to client socket
-        new_socket = (int*)malloc(1);
+        new_socket = (int*)malloc(sizeof(int));
         *new_socket = client_socket;
         
         // Spawn new thread for handling that client
@@ -70,23 +74,31 @@ void Server::listenConnections()
             std::cerr << "Could not create thread for socket " << client_socket << std::endl;
             close(client_socket);
         }
-          
-        // Add thread to list of connection handlers
-        connection_handler_threads.push_back(comm_thread);
 
-        // Free new socket pointer
-        //free(new_socket);
+        // Request write rights
+        threads_monitor.requestWrite();
+         
+        // Add thread to list of connection handlers
+        connection_handler_threads.insert(std::make_pair(*new_socket, comm_thread));
+
+        // Release write rights
+        threads_monitor.releaseWrite();
+
     }
 
+    // Request read rights
+    threads_monitor.requestRead();
+    
     // Wait for all threads to finish
-    for (std::vector<pthread_t>::iterator i = connection_handler_threads.begin(); i != connection_handler_threads.end(); ++i)
+    for (std::map<int, pthread_t>::iterator i = connection_handler_threads.begin(); i != connection_handler_threads.end(); ++i)
     {
         std::cout << "Waiting for client communication to end..." << std::endl;
-        pthread_t* ref = &(*i);
+        pthread_t* ref = &(i->second);
         pthread_join(*ref, NULL);
     }
 
-    // TODO Wait for Group and Message managers to end
+    // Release read rights
+    threads_monitor.releaseRead();
 
 }
 
@@ -175,7 +187,7 @@ void *Server::handleConnection(void* arg)
                     user = new User(login_payload_buffer->username);
 
                 // Try to join that group with this user
-                if (user->joinGroup(group))
+                if (user->joinGroup(group) != 0)
                 {
                     // Recover message history for this user
                     group->recoverHistory(Server::message_history, user);
@@ -204,8 +216,12 @@ void *Server::handleConnection(void* arg)
                 break;
         }
 
-        // Clear buffer to receive new packets
-        for (int i=0; i < PACKET_MAX; i++) client_message[i] = '\0';
+        // Clear buffers to receive and send new packets
+        for (int i=0; i < PACKET_MAX; i++)
+        {
+            client_message[i] = '\0';
+            server_message[i] = '\0';
+        }
     }
 
     // Debug message
@@ -214,8 +230,17 @@ void *Server::handleConnection(void* arg)
     // Leave group with this user
     user->leaveGroup(group);
 
-    // Free received argument pointer
+    // Free received argument
     free(arg);
+
+    // Request write rights
+    threads_monitor.requestWrite();
+
+    // Remove itself from the threads list
+    connection_handler_threads.erase(socket);
+
+    // Release write rights
+    threads_monitor.releaseWrite();
 
     // Exit
     pthread_exit(NULL);
@@ -243,6 +268,18 @@ void Server::setupConnection()
     
 }
 
+void Server::listThreads()
+{
+    threads_monitor.requestRead();
+
+    for (std::map<int, pthread_t>::iterator i = connection_handler_threads.begin(); i != connection_handler_threads.end(); ++i)
+    {
+        std::cout << "Thread associated with socket " << i->first <<std::endl;
+    }
+
+    threads_monitor.releaseRead();
+}
+
 int Server::sendPacket(int socket, int packet_type, char* payload, int payload_size)
 {
     int packet_size = -1;  // Size of packet to be sent
@@ -264,7 +301,9 @@ int Server::sendPacket(int socket, int packet_type, char* payload, int payload_s
         throw std::runtime_error("Unable to send message to server");
 
     // Free memory used for packet
+    std::cout << "Freeing data variable (sendPacket)" << std::endl;
     free(data);
+    std::cout << "Done" << std::endl;
 
     // Return number of bytes sent
     return bytes_sent;

@@ -12,6 +12,7 @@
 
 #include "data_types.h"
 #include "constants.h"
+#include "RW_Monitor.h"
 
 class Server
 {
@@ -23,13 +24,14 @@ class Server
 
     static std::atomic<bool> stop_issued; // Atomic thread for stopping all threads
     int server_socket;  // Socket the server listens at for new incoming connections
-    int client_socket;  // Socket the client connects from
+    
     struct sockaddr_in server_address;  // Server socket address
     struct sockaddr_in client_address;  // Client socket address
     static int message_history;    // Amount of old group messages to show clients
 
     pthread_t command_handler_thread; // Thread for handling server
-    std::vector<pthread_t> connection_handler_threads; // Threads for handling client connections
+    static std::map<int, pthread_t> connection_handler_threads; // Threads for handling client connections
+    static RW_Monitor threads_monitor;  // Monitor for connection handler threads list
 
     // Public methods
     public:
@@ -76,6 +78,12 @@ class Server
      * Normally, there should be one handleConnection thread per connected client
      */
     static void *handleConnection(void* arg);
+
+    /**
+     * Lists all threads currently active and what socket they are
+     * assigned to
+     */
+    static void listThreads();
 
     /**
      * Sends a packet with given payload to the provided socket descriptor
