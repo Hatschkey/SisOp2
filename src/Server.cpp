@@ -131,6 +131,7 @@ void *Server::handleConnection(void* arg)
     int            socket = *(int*)arg;         // Client socket
     int            read_bytes = -1;             // Number of bytes read from the message
     char           client_message[PACKET_MAX];  // Buffer for client message, maximum of PACKET_MAX bytes
+    char           server_message[PACKET_MAX];  // Buffer for messages the server will send to the client, max PACKET_MAX bytes
     login_payload* login_payload_buffer;        // Buffer for client login information
     std::string    message;                     // User chat message
 
@@ -183,8 +184,9 @@ void *Server::handleConnection(void* arg)
                 {
                     // If user was not able to join group, refuse connection
 
-                    // TODO Send message to client informing max of MAX_SESSIONS sessions
-                    std::cout << "Connection was refused due to exceding MAX_SESSIONS: " << MAX_SESSIONS << std::endl;
+                    // TODO Send message in some type of standard struct
+                    sprintf(server_message, "%s %d", "Connection was refused due to exceding MAX_SESSIONS: ", MAX_SESSIONS);
+                    sendPacket(socket, PAK_CMD, server_message, sizeof(char)*strlen(server_message) + 1);
 
                     // Reject connection
                     close(socket);

@@ -84,10 +84,13 @@ void Client::handleUserInput()
         }
         
     }
-    while(std::getline(std::cin, user_message));
+    while(!stop_issued && std::getline(std::cin, user_message));
 
     // Signal server-litening thread to stop
     stop_issued = true;
+
+    // Close listening socket
+    shutdown(server_socket, SHUT_RDWR);
 
     // Wait for thread to finish
     pthread_join(server_listener_thread,NULL);
@@ -96,19 +99,46 @@ void Client::handleUserInput()
 void *Client::getMessages(void* arg)
 {
     int read_bytes = -1;
-    //char server_message[PACKET_MAX];
+    char server_message[PACKET_MAX];
 
-    // TODO Wait for messages from the server
-    while(!stop_issued)
+    // Wait for messages from the server
+    // TODO Change from recv to non blocking option or find a way to stop safely
+    while(!stop_issued && (read_bytes = recv(server_socket, server_message, PACKET_MAX, 0)) > 0)
     {
+        // Decode message into packet format
+        packet* received_packet = (packet*)server_message;
 
+        switch(received_packet->type)
+        {
+            case PAK_DAT: // Data packet (messages)
+                // TODO extract message metadata and content from agreed struct
+                break;
+            case PAK_CMD: // Command packet (disconnect)
+
+                // Show message sent from the server to user
+                std::cout << "\n" << received_packet->_payload << std::endl;
+                
+                // Stop the client application
+                stop_issued = true;
+                read_bytes = 0;
+
+                break;
+
+            default: // Unknown packet 
+                std::cout << "\nReceived unknown packet type from server: " << received_packet->type << std::endl;
+                break;
+        }
+
+        // Clear buffer to receive new packets
+        for (int i=0; i < PACKET_MAX; i++) server_message[i] = '\0';
     }
     // If server closes connection
     if (read_bytes == 0)
     {
-        std::cout << "Connection closed by server" << std::endl;
+        std::cout << "\nConnection closed." << std::endl;
     }
 
+    // End with no return value
     pthread_exit(NULL);
 };
 
