@@ -25,7 +25,7 @@ class Client
     static int  server_socket;              // Socket for remote server communication
     struct sockaddr_in server_address;      // Server socket address
 
-    pthread_t server_listener_thread;       // Thread to listen for new incoming server messages
+    static pthread_t input_handler_thread;         // Thread to listen for new incoming server messages
 
     // Public methods
     public:
@@ -50,17 +50,17 @@ class Client
     void setupConnection();
 
     /**
-     * Handles getting user input so that it may be sent to the remtoe server
+     * Poll server for any new messages, showing them to the user
      */
-    void handleUserInput();
+    void getMessages();
 
     private:
 
     /**
-     * Poll server for any new messages, showing them to the user
-     * This should run in a separate thread to handleUserInput
+     * Handles getting user input so that it may be sent to the remtoe server
+     * This should run in a separate thread to getMessages
      */
-    static void *getMessages(void* arg);
+    static void *handleUserInput(void* arg);
 
     /**
      * Send packet to server with login information (User and Group)
@@ -73,6 +73,6 @@ class Client
      * @param message Message to be sent to the chatroom
      * @return Number of bytes sent to remote server
      */
-    int sendMessagePacket(std::string message);
+    static int sendMessagePacket(std::string message);
 
 };

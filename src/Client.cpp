@@ -2,6 +2,7 @@
 
 std::atomic<bool> Client::stop_issued;
 int Client::server_socket;
+pthread_t Client::input_handler_thread;
 
 Client::Client(std::string username, std::string groupname, std::string server_ip, std::string server_port)
 {
@@ -56,12 +57,70 @@ void Client::setupConnection()
     // Send the first packet for login
     sendLoginPacket();
 
-    // Start message getter thread
-    pthread_create(&server_listener_thread,NULL, getMessages, NULL);
+    // Start user input getter thread
+    pthread_create(&input_handler_thread,NULL, handleUserInput, NULL);
 
 };
 
-void Client::handleUserInput()
+void Client::getMessages()
+{
+    int read_bytes = -1;                // Number of bytes
+    char server_message[PACKET_MAX];    // Buffer for message sent from server
+    message_record* received_message;   // Pointer to a message record, used to decode received packet payload
+
+    // Clear buffer to receive new packets
+    for (int i=0; i < PACKET_MAX; i++) server_message[i] = '\0';
+    
+    // Wait for messages from the server
+    // TODO Change from recv to non blocking option or find a way to stop safely
+    while(!stop_issued && (read_bytes = recv(server_socket, server_message, PACKET_MAX, 0)) > 0)
+    {
+        // Decode message into packet format
+        packet* received_packet = (packet*)server_message;
+
+        switch(received_packet->type)
+        {
+            case PAK_DAT: // Data packet (messages)
+            
+                // Decode payload into a message record
+                received_message = (message_record*)received_packet->_payload;
+
+                // Check if this message was sent by the connected user
+                if (strcmp(received_message->username, this->username.c_str()) == 0)
+                    printf("Received msg");
+
+                break;
+            case PAK_CMD: // Command packet (disconnect)
+
+                // Show message sent from the server to user
+                std::cout << "\n" << received_packet->_payload << std::endl;
+                
+                // Stop the client application
+                stop_issued = true;
+                read_bytes = 0;
+
+                break;
+
+            default: // Unknown packet 
+                std::cout << "\nReceived unknown packet type from server: " << received_packet->type << std::endl;
+                break;
+        }
+
+        // Clear buffer to receive new packets
+        for (int i=0; i < PACKET_MAX; i++) server_message[i] = '\0';
+    }
+    // If server closes connection
+    if (read_bytes == 0)
+    {
+        std::cout << "\nConnection closed." << std::endl;
+    }
+
+    // Wait for thread to finish
+    pthread_join(Client::input_handler_thread,NULL);
+
+};
+
+void *Client::handleUserInput(void* arg)
 {
     // Flush stdin so no empty message is sent
     fflush(stdin);
@@ -91,52 +150,6 @@ void Client::handleUserInput()
 
     // Close listening socket
     shutdown(server_socket, SHUT_RDWR);
-
-    // Wait for thread to finish
-    pthread_join(server_listener_thread,NULL);
-};
-
-void *Client::getMessages(void* arg)
-{
-    int read_bytes = -1;
-    char server_message[PACKET_MAX];
-
-    // Wait for messages from the server
-    // TODO Change from recv to non blocking option or find a way to stop safely
-    while(!stop_issued && (read_bytes = recv(server_socket, server_message, PACKET_MAX, 0)) > 0)
-    {
-        // Decode message into packet format
-        packet* received_packet = (packet*)server_message;
-
-        switch(received_packet->type)
-        {
-            case PAK_DAT: // Data packet (messages)
-                // TODO extract message metadata and content from agreed struct
-                break;
-            case PAK_CMD: // Command packet (disconnect)
-
-                // Show message sent from the server to user
-                std::cout << "\n" << received_packet->_payload << std::endl;
-                
-                // Stop the client application
-                stop_issued = true;
-                read_bytes = 0;
-
-                break;
-
-            default: // Unknown packet 
-                std::cout << "\nReceived unknown packet type from server: " << received_packet->type << std::endl;
-                break;
-        }
-
-        // Clear buffer to receive new packets
-        for (int i=0; i < PACKET_MAX; i++) server_message[i] = '\0';
-    }
-    // If server closes connection
-    if (read_bytes == 0)
-    {
-        std::cout << "\nConnection closed." << std::endl;
-    }
 
     // End with no return value
     pthread_exit(NULL);
