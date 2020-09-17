@@ -182,6 +182,7 @@ void User::leaveGroup(Group* group)
 
 int User::say(std::string message, std::string groupname)
 {
+
     // Fetch the group
     Group* group = Group::getGroup(groupname);
 

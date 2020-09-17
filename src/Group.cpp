@@ -282,9 +282,6 @@ int Group::recoverHistory(int n, User* user)
     // Get total message count
     fread(&total_messages, sizeof(long), 1, hist);
 
-    // TODO Debug message
-    //std::cout << "Group history file has " << total_messages << " messages" << std::endl;
-
     // Iterate through history file reading headers
     while (current_message < total_messages && fread(header_buffer, sizeof(message_record), 1, hist) > 0)
     {
@@ -295,7 +292,7 @@ int Group::recoverHistory(int n, User* user)
             fread(message_buffer,((message_record*)header_buffer)->length, 1, hist);
 
             // TODO Placeholder send message to user
-            //std::cout << "TODO Send message \"" << message_buffer << "\" by " << ((message_record*)header_buffer)->username << " to user " << user->username << std::endl;
+            std::cout << "TODO Send message \"" << message_buffer << "\" by " << ((message_record*)header_buffer)->username << " to user " << user->username << std::endl;
 
             // Increase read message counter
             read_messages++;

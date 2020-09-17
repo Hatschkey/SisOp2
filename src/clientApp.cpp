@@ -20,8 +20,8 @@ int main(int argc, char** argv)
         // Setup a connection to the server
         client.setupConnection();
 
-        // Start getting user messages to be sent
-        client.handleUserInput();
+        // Start listening for the server
+        client.getMessages();
         
     }
     catch(const std::invalid_argument& e)
