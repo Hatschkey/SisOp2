@@ -202,7 +202,7 @@ int Group::getUserCount()
     return user_count;
 }
 
-int Group::post(std::string& message, std::string username)
+int Group::post(std::string message, std::string username)
 {
 
     // Save this message
@@ -305,6 +305,9 @@ int Group::recoverHistory(int n, User* user)
         
         // Increase current message
         current_message++;
+
+        // Reset message buffer for reading new messages
+        for (int i=0; i < PACKET_MAX; i++) message_buffer[i] = '\0';
     }
 
     // Close file that was opened for reading

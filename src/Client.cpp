@@ -58,7 +58,7 @@ void Client::setupConnection()
     sendLoginPacket();
 
     // Start user input getter thread
-    pthread_create(&input_handler_thread,NULL, handleUserInput, NULL);
+    pthread_create(&input_handler_thread, NULL, handleUserInput, NULL);
 
 };
 
@@ -81,13 +81,26 @@ void Client::getMessages()
         switch(received_packet->type)
         {
             case PAK_DAT: // Data packet (messages)
-            
+
                 // Decode payload into a message record
                 received_message = (message_record*)received_packet->_payload;
 
-                // Check if this message was sent by the connected user
+                // TODO Debug message
+                std::cout << "Received packet from server with " << received_message->length << " bytes" << std::endl;
+
+                // If message was sent by this user, change display name to "You"
                 if (strcmp(received_message->username, this->username.c_str()) == 0)
-                    printf("Received msg");
+                {
+                    sprintf(received_message->username,"%s","You");
+                }
+                // If not, add brackets to display name: [username]
+                else
+                {
+                    sprintf(received_message->username,"[%s]",received_message->username);
+                }
+
+                // Display message
+                std::cout << std::ctime((time_t*)&received_message->timestamp) << " " << received_message->username << ": " << received_message->_message << std::endl;
 
                 break;
             case PAK_CMD: // Command packet (disconnect)

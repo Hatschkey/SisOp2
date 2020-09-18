@@ -4,6 +4,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <chrono>
+#include <ctime>
 #include <unistd.h>
 #include <iostream>
 #include <atomic>
