@@ -10,8 +10,8 @@ all: dirs client server
 server: RW_Monitor.o User.o Group.o serverApp.o
 	${CC} ${OBJ_DIR}serverApp.o ${OBJ_DIR}Server.o ${OBJ_DIR}RW_Monitor.o ${OBJ_DIR}User.o ${OBJ_DIR}Group.o -o ${BIN_DIR}server -lpthread -Wall    
 
-client: clientApp.o
-	${CC} ${OBJ_DIR}clientApp.o ${OBJ_DIR}Client.o -o ${BIN_DIR}client -lpthread -Wall
+client: ClientInterface.o clientApp.o
+	${CC} ${OBJ_DIR}ClientInterface.o ${OBJ_DIR}clientApp.o ${OBJ_DIR}Client.o -o ${BIN_DIR}client -lncurses -lpthread -Wall
 	
 serverApp.o: Server.o ${SRC_DIR}serverApp.cpp ${INC_DIR}data_types.h ${INC_DIR}constants.h
 	${CC} -c ${SRC_DIR}serverApp.cpp -I ${INC_DIR} -o ${OBJ_DIR}serverApp.o -Wall
@@ -33,6 +33,9 @@ User.o:
 
 RW_Monitor.o:
 	${CC} -c ${SRC_DIR}RW_Monitor.cpp -I ${INC_DIR} -o ${OBJ_DIR}RW_Monitor.o -Wall
+
+ClientInterface.o:
+	${CC} -c ${SRC_DIR}ClientInterface.cpp -I ${INC_DIR} -o ${OBJ_DIR}ClientInterface.o -Wall
 
 dirs:
 	mkdir -p ${OBJ_DIR}

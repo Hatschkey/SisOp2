@@ -29,10 +29,16 @@ Client::Client(std::string username, std::string groupname, std::string server_i
 
     // Set atomic flag as false
     stop_issued = false;
+
+    // Initialize client interface
+    ClientInterface::init(groupname);
 };
 
 Client::~Client()
 {
+    // Finalize client interface
+    ClientInterface::destroy();
+
     // Close server socket if it is still open
     if (server_socket > 0)
         close(server_socket);
@@ -68,11 +74,12 @@ void Client::getMessages()
     char server_message[PACKET_MAX];    // Buffer for message sent from server
     message_record* received_message;   // Pointer to a message record, used to decode received packet payload
 
+    std::string chat_message; // Final composed chat message string, printed to the interface
+
     // Clear buffer to receive new packets
     for (int i=0; i < PACKET_MAX; i++) server_message[i] = '\0';
     
     // Wait for messages from the server
-    // TODO Change from recv to non blocking option or find a way to stop safely
     while(!stop_issued && (read_bytes = recv(server_socket, server_message, PACKET_MAX, 0)) > 0)
     {
         // Decode message into packet format
@@ -84,9 +91,6 @@ void Client::getMessages()
 
                 // Decode payload into a message record
                 received_message = (message_record*)received_packet->_payload;
-
-                // TODO Debug message
-                std::cout << "Received packet from server with " << received_message->length << " bytes" << std::endl;
 
                 // If message was sent by this user, change display name to "You"
                 if (strcmp(received_message->username, this->username.c_str()) == 0)
@@ -100,14 +104,14 @@ void Client::getMessages()
                 }
 
                 // Display message
-                std::cout << std::ctime((time_t*)&received_message->timestamp) << " " << received_message->username << ": " << received_message->_message << std::endl;
+                chat_message = std::ctime((time_t*)&received_message->timestamp) + std::string(" ") + received_message->username + ": " + received_message->_message;
+                ClientInterface::printMessage(chat_message);
 
                 break;
             case PAK_CMD: // Command packet (disconnect)
 
-                // Show message sent from the server to user
-                std::cout << "\n" << received_packet->_payload << std::endl;
-                
+                ClientInterface::printMessage(received_packet->_payload);
+
                 // Stop the client application
                 stop_issued = true;
                 read_bytes = 0;
@@ -115,7 +119,7 @@ void Client::getMessages()
                 break;
 
             default: // Unknown packet 
-                std::cout << "\nReceived unknown packet type from server: " << received_packet->type << std::endl;
+                ClientInterface::printMessage("Received unkown packet from server");
                 break;
         }
 
@@ -139,16 +143,29 @@ void *Client::handleUserInput(void* arg)
     fflush(stdin);
 
     // Get user messages to be sent until Ctrl D is pressed
-    std::string user_message;
+    char user_message[MESSAGE_MAX];
     do
     {
-        
-        std::cout << "Say something: ";
+        // Get user message
+        // TODO Detect Ctrl D press instead of Ctrl C
+        getstr(user_message);
         try
         {
-            // Don't send empty messages
-            if (!user_message.empty())
-                sendMessagePacket(user_message);
+            // Reset input area below the screen
+            ClientInterface::resetInput();
+
+            // If user pressed ctrl D
+            if (user_message[0] == KEY_END)
+            {
+                // End program
+                stop_issued = true;
+            }
+            else
+            {    
+                // Don't send empty messages
+                if (strlen(user_message) > 0)
+                    sendMessagePacket(std::string(user_message));
+            }
         }
         catch(const std::runtime_error& e)
         {
@@ -156,7 +173,7 @@ void *Client::handleUserInput(void* arg)
         }
         
     }
-    while(!stop_issued && std::getline(std::cin, user_message));
+    while(!stop_issued);
 
     // Signal server-litening thread to stop
     stop_issued = true;

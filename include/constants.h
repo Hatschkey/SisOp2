@@ -5,6 +5,7 @@
 #define MAX_SESSIONS 2       // Maximum number of active sessions per user
 #define USER_TIMEOUT 60      // Time (in seconds) for user to be kept alive
 #define PACKET_MAX   2048    // Maximum size (in bytes) for a packet
+#define MESSAGE_MAX  256     // Maximum size (in bytes) for a user message
 
 // Packet types
 #define PAK_DAT 1 // Message packet

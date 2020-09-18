@@ -13,6 +13,8 @@
 #include "constants.h"
 #include "data_types.h"
 
+#include "ClientInterface.h"
+
 class Client
 {
     // Private attributes

@@ -146,7 +146,6 @@ void *Server::handleConnection(void* arg)
     char           server_message[PACKET_MAX];  // Buffer for messages the server will send to the client, max PACKET_MAX bytes
     login_payload* login_payload_buffer;        // Buffer for client login information
     std::string    message;                     // User chat message
-    std::string    msg = "Group history is coming shortly";
 
     User* user   = NULL; // User the client is connected as
     Group* group = NULL; // Group the client is connected to
@@ -192,17 +191,6 @@ void *Server::handleConnection(void* arg)
                 {
                     // Recover message history for this user
                     group->recoverHistory(Server::message_history, user);
-                    
-                    message_record* placeholder_msg_rec = (message_record*)malloc(sizeof(*placeholder_msg_rec) + sizeof(char)*(strlen(msg.c_str()) + 1));
-                    sprintf(placeholder_msg_rec->username,"%s", user->username.c_str());
-                    placeholder_msg_rec->length = strlen(msg.c_str()) + 1;
-                    placeholder_msg_rec->timestamp = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-                    sprintf((char*)placeholder_msg_rec->_message, "%s", msg.c_str());
-
-                    sendPacket(socket, PAK_DAT, (char*)placeholder_msg_rec, sizeof(*placeholder_msg_rec) + sizeof(char)*(strlen(msg.c_str()) + 1));
-
-                    free(placeholder_msg_rec);
-
                 }
                 else
                 {
