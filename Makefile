@@ -4,6 +4,7 @@ SRC_DIR := src/
 OBJ_DIR := obj/
 BIN_DIR := bin/
 INC_DIR := include/
+HIST_DIR := bin/hist/
 
 all: dirs ${BIN_DIR}client ${BIN_DIR}server
 
@@ -40,13 +41,14 @@ ${OBJ_DIR}ClientInterface.o:
 dirs:
 	mkdir -p ${OBJ_DIR}
 	mkdir -p ${BIN_DIR}
+	mkdir -p ${HIST_DIR}
 
 clean:	
-	rm ${OBJ_DIR}*.o ${BIN_DIR}server ${BIN_DIR}client ${BIN_DIR}*.hist *.hist
+	rm ${OBJ_DIR}*.o ${BIN_DIR}server ${BIN_DIR}client ${HIST_DIR}*.hist
 
 run_server: ${BIN_DIR}server
-	./${BIN_DIR}server 50
+	cd ${BIN_DIR} && ./server 50
 
 run_client: ${BIN_DIR}client
-	./${BIN_DIR}client user group 127.0.0.1 6789
+	cd ${BIN_DIR} && ./client user group 127.0.0.1 6789
 
