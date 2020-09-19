@@ -70,7 +70,8 @@ void Client::setupConnection()
 
 void Client::getMessages()
 {
-    int read_bytes = -1;                // Number of bytes
+    int read_bytes = -1;                // Number of bytes read from the header
+    int payload_bytes = 0;              // Number of bytes read from the payload
     char server_message[PACKET_MAX];    // Buffer for message sent from server
     message_record* received_message;   // Pointer to a message record, used to decode received packet payload
     packet* received_packet;
@@ -87,9 +88,13 @@ void Client::getMessages()
         // Decode message into packet format
         received_packet = (packet*)server_message;
 
+        // Wait for the entire message to arrive
+        while (payload_bytes < received_packet->length) 
+        {
+            payload_bytes += recv(server_socket, server_message + read_bytes, received_packet->length - payload_bytes, 0);
+        }
+        
         // Try to read the rest of the payload from the socket stream
-        recv(server_socket, server_message + read_bytes, received_packet->length, 0);
-
         switch(received_packet->type)
         {
             case PAK_DAT: // Data packet (messages)
@@ -131,6 +136,9 @@ void Client::getMessages()
 
         // Clear buffer to receive new packets
         for (int i=0; i < PACKET_MAX; i++) server_message[i] = '\0';
+
+        // Reset number of bytes read from payload
+        payload_bytes = 0;
     }
     // If server closes connection
     if (read_bytes == 0)
