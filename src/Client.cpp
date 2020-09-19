@@ -82,18 +82,13 @@ void Client::getMessages()
     for (int i=0; i < PACKET_MAX; i++) server_message[i] = '\0';
 
     // Wait for messages from the server
-    while(!stop_issued && (read_bytes = recv(server_socket, server_message, PACKET_MAX, 0)) > 0)
+    while(!stop_issued && (read_bytes = recv(server_socket, server_message, sizeof(packet), 0)) > 0)
     {
-        /*
-        * TODO
-        *  Here, when the server sends multiple messages rapidly, recv can end up reading 
-        * multiple messages at once, e.g. 1 ' and a half ' messages.
-        *  So, we need the message sequence number in order for the client to be able to tell
-        * when the message ends and the 'half message' begins, and wait until it arrives
-        */
-    
         // Decode message into packet format
         received_packet = (packet*)server_message;
+
+        // Try to read the rest of the payload from the socket stream
+        recv(server_socket, server_message + read_bytes, received_packet->length, 0);
 
         switch(received_packet->type)
         {
