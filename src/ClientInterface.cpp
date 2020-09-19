@@ -35,7 +35,7 @@ void ClientInterface::destroy()
 void ClientInterface::printMessage(std::string message)
 {
 
-    int message_line_count = (int)ceil((float)message.length()/max_columns); // Calculate amount of lines this message occupies 
+    int message_line_count = 1 + (int)ceil((float)message.length()/max_columns); // Calculate amount of lines this message occupies 
 
     // Save old x and y cursor pos
     int old_cursor_x;

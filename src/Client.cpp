@@ -73,17 +73,19 @@ void Client::getMessages()
     int read_bytes = -1;                // Number of bytes
     char server_message[PACKET_MAX];    // Buffer for message sent from server
     message_record* received_message;   // Pointer to a message record, used to decode received packet payload
+    packet* received_packet;
 
     std::string chat_message; // Final composed chat message string, printed to the interface
+    std::string username;   // Name of the user who sent the message
 
     // Clear buffer to receive new packets
     for (int i=0; i < PACKET_MAX; i++) server_message[i] = '\0';
-    
+
     // Wait for messages from the server
     while(!stop_issued && (read_bytes = recv(server_socket, server_message, PACKET_MAX, 0)) > 0)
     {
         // Decode message into packet format
-        packet* received_packet = (packet*)server_message;
+        received_packet = (packet*)server_message;
 
         switch(received_packet->type)
         {
@@ -100,7 +102,8 @@ void Client::getMessages()
                 // If not, add brackets to display name: [username]
                 else
                 {
-                    sprintf(received_message->username,"[%s]",received_message->username);
+                    username = std::string("[") + received_message->username + "]";
+                    sprintf(received_message->username,"%s",username.c_str());
                 }
 
                 // Display message
@@ -153,19 +156,11 @@ void *Client::handleUserInput(void* arg)
         {
             // Reset input area below the screen
             ClientInterface::resetInput();
+            
+            // Don't send empty messages
+            if (strlen(user_message) > 0)
+                sendMessagePacket(std::string(user_message));
 
-            // If user pressed ctrl D
-            if (user_message[0] == KEY_END)
-            {
-                // End program
-                stop_issued = true;
-            }
-            else
-            {    
-                // Don't send empty messages
-                if (strlen(user_message) > 0)
-                    sendMessagePacket(std::string(user_message));
-            }
         }
         catch(const std::runtime_error& e)
         {
