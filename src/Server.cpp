@@ -147,6 +147,11 @@ void *Server::handleConnection(void* arg)
     login_payload* login_payload_buffer;        // Buffer for client login information
     std::string    message;                     // User chat message
 
+    char message_records[PACKET_MAX*Server::message_history];
+    message_record* read_message;
+    int read_messages = 0;
+    int offset = 0;
+
     User* user   = NULL; // User the client is connected as
     Group* group = NULL; // Group the client is connected to
 
@@ -190,12 +195,27 @@ void *Server::handleConnection(void* arg)
                 if (user->joinGroup(group) != 0)
                 {
                     // Recover message history for this user
-                    group->recoverHistory(Server::message_history, user);
+                    read_messages = group->recoverHistory(message_records, Server::message_history, user);
+
+                    for (int i = 0; i < read_messages; i++)
+                    {
+                        read_message = (message_record*)(message_records + offset);
+
+                        memcpy(server_message, message_records + offset, sizeof(message_record) + read_message->length);
+                    
+                        sendPacket(socket, PAK_DAT, server_message, sizeof(message_record) + ((message_record*)server_message)->length);
+
+                        //std::cout << ((message_record*)server_message)->username << std::endl;
+                        //std::cout << ((message_record*)server_message)->timestamp << std::endl;
+                        //std::cout << ((message_record*)server_message)->length << std::endl;
+                        //std::cout << ((message_record*)server_message)->_message << std::endl;
+
+                        offset += sizeof(message_record) + ((message_record*)server_message)->length;
+                    }
                 }
                 else
                 {
                     // If user was not able to join group, refuse connection
-
                     // TODO Send message in some type of standard struct
                     sprintf(server_message, "%s %d", "Connection was refused due to exceding MAX_SESSIONS: ", MAX_SESSIONS);
                     sendPacket(socket, PAK_CMD, server_message, sizeof(char)*strlen(server_message) + 1);
@@ -287,7 +307,7 @@ int Server::sendPacket(int socket, int packet_type, char* payload, int payload_s
 
     // Prepare packet
     packet* data = (packet*)malloc(sizeof(*data) + sizeof(char) * payload_size);
-    data->type      = PAK_CMD; // Signal that a data packet is being sent
+    data->type      = packet_type; // Signal that a data packet is being sent
     data->sqn       = 1; // TODO Keep track of the packet sequence numbers
     data->timestamp = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()); // Current timestamp
     data->length = payload_size;    // Update payload size
@@ -301,9 +321,7 @@ int Server::sendPacket(int socket, int packet_type, char* payload, int payload_s
         throw std::runtime_error("Unable to send message to server");
 
     // Free memory used for packet
-    std::cout << "Freeing data variable (sendPacket)" << std::endl;
     free(data);
-    std::cout << "Done" << std::endl;
 
     // Return number of bytes sent
     return bytes_sent;
