@@ -245,12 +245,18 @@ void *Server::handleConnection(void* arg)
     // Exit
     pthread_exit(NULL);
 }
+std::string Server::get_error_message(const std::string message)
+{
+    std::string detailedMessage;
+    detailedMessage.append(nice_text).append(" (").append(strerror(errno)).append(")");
+    return detailedMessage;
+}
 
 void Server::setupConnection()
 {
     // Create socket
     if ( (server_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-        throw std::runtime_error("Error during socket creation");
+        throw std::runtime_error(get_error_message("Error during socket creation"));
 
     // Prepare server socket address
     server_address.sin_family = AF_INET;
@@ -260,11 +266,11 @@ void Server::setupConnection()
     // Set socket options
     int yes = 1;
     if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1)
-        throw std::runtime_error("Error setting socket options");
+        throw std::runtime_error(get_error_message("Error setting socket options"));
 
     // Bind socket
     if ( bind(server_socket, (struct sockaddr *)&server_address, sizeof(server_address)) < 0)
-        throw std::runtime_error("Error during socket bind");
+        throw std::runtime_error(get_error_message("Error during socket bind"));
     
 }
 

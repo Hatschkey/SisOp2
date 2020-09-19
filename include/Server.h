@@ -9,6 +9,7 @@
 #include <atomic>
 #include <pthread.h>
 #include <cmath>
+#include <errno.h>
 
 #include "data_types.h"
 #include "constants.h"
@@ -24,6 +25,7 @@ class Server
 
     static std::atomic<bool> stop_issued; // Atomic thread for stopping all threads
     int server_socket;  // Socket the server listens at for new incoming connections
+    std::string get_error_message(const std::string message); // Add details of the error to the message
     
     struct sockaddr_in server_address;  // Server socket address
     struct sockaddr_in client_address;  // Client socket address
