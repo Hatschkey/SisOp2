@@ -265,13 +265,15 @@ void Group::saveMessage(std::string message, std::string username)
     free(msg);
 }
 
-int Group::recoverHistory(int n, User* user)
+int Group::recoverHistory(char* message_record_list, int n, User* user)
 {
     char header_buffer[PACKET_MAX]; // Buffer for message headers that will be read
     char message_buffer[PACKET_MAX]; // Buffer for messages that will be read
     long total_messages = 0;  // Total number of messages in the file
     long current_message = 0; // Currently indexed message in the file
     int read_messages = 0; // Number of messages that were read and sent to user
+    int offset = 0; // Number of bytes needed to shift after the insert of a message into the message_record_list
+    message_record* message; // A message_record object used to copy the message into the message_record_list buffer
 
     // Request reading rights
     history_file_monitor.requestRead();
@@ -291,8 +293,16 @@ int Group::recoverHistory(int n, User* user)
             // Read the associated message
             fread(message_buffer,((message_record*)header_buffer)->length, 1, hist);
 
-            // TODO Placeholder send message to user
-            std::cout << "TODO Send message \"" << message_buffer << "\" by " << ((message_record*)header_buffer)->username << " to user " << user->username << std::endl;
+            message = (message_record*)malloc(sizeof(message_record) + sizeof(char)*(strlen(message_buffer) + 1));
+            sprintf(message->username, "%s", ((message_record*)header_buffer)->username);
+            message->length = ((message_record*)header_buffer)->length;
+            message->timestamp = ((message_record*)header_buffer)->timestamp;
+            sprintf((char*)message->_message, "%s", message_buffer);
+
+            memcpy(message_record_list + offset, (void*)message, sizeof(message_record) + message->length);
+
+            // offset for inserting a new message into the message_record_List buffer
+            offset += sizeof(message_record) + message->length;
 
             // Increase read message counter
             read_messages++;
@@ -306,8 +316,14 @@ int Group::recoverHistory(int n, User* user)
         // Increase current message
         current_message++;
 
+        free(message);
+
         // Reset message buffer for reading new messages
-        for (int i=0; i < PACKET_MAX; i++) message_buffer[i] = '\0';
+        for (int i=0; i < PACKET_MAX; i++) 
+        {
+            header_buffer[i] = '\0';
+            message_buffer[i] = '\0';
+        }
     }
 
     // Close file that was opened for reading

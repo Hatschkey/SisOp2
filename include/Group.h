@@ -9,6 +9,7 @@
 #include "data_types.h"
 #include "User.h"
 #include "RW_Monitor.h"
+#include <list>
 
 // Forward declare User
 class User;
@@ -109,11 +110,12 @@ class Group
 
     /**
      * Recovers the last N messages from the group's history file, sending them to the user
+     * @param message_record_list Buffer for reading recorded messages history 
      * @param n    Number of messages that will be recovered
      * @param user Pointer to the user instance that will receive these messages
-     * @return Number of messages recovered from the file
+     * @return Number of recorded messages retrieved from the grupo.hist file
      */
-    int recoverHistory(int n, User* user);
+    int recoverHistory(char* message_record_list, int n, User* user);
 
 };
 
