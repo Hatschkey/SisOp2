@@ -62,7 +62,7 @@ void User::listUsers()
         std::cout << std::endl;
         std::cout << "Username: " << i->second->username << std::endl;
         std::cout << "Active sessions: " << i->second->getSessionCount() << std::endl;
-        std::cout << "Last seen: " << i->second->last_seen << std::endl;
+        std::cout << "Last seen: " << std::ctime((time_t*)&(i->second->last_seen)) << std::endl;
     }
     
     // Release read rights

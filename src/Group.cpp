@@ -17,10 +17,10 @@ Group::Group(std::string groupname)
     history_file_monitor.requestWrite();
 
     // Check if it already existed
-    if ( (this->history_file = fopen(history_filename.c_str(),"rb+")) == NULL)
+    if ( (this->history_file = fopen((HIST_PATH + history_filename).c_str(),"rb+")) == NULL)
     {
         // If not, create it
-        this->history_file = fopen(history_filename.c_str(),"wb+");
+        this->history_file = fopen((HIST_PATH + history_filename).c_str(),"wb+");
 
         // And add the header into it
         message_count = 0;
@@ -279,7 +279,7 @@ int Group::recoverHistory(char* message_record_list, int n, User* user)
     history_file_monitor.requestRead();
 
     // Open history file for reading
-    FILE* hist = fopen(std::string(this->groupname + ".hist").c_str(), "rb");
+    FILE* hist = fopen((HIST_PATH + std::string(this->groupname + ".hist")).c_str(), "rb");
 
     // Get total message count
     fread(&total_messages, sizeof(long), 1, hist);

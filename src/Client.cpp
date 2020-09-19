@@ -29,10 +29,16 @@ Client::Client(std::string username, std::string groupname, std::string server_i
 
     // Set atomic flag as false
     stop_issued = false;
+
+    // Initialize client interface
+    ClientInterface::init(groupname);
 };
 
 Client::~Client()
 {
+    // Finalize client interface
+    ClientInterface::destroy();
+
     // Close server socket if it is still open
     if (server_socket > 0)
         close(server_socket);
@@ -58,43 +64,65 @@ void Client::setupConnection()
     sendLoginPacket();
 
     // Start user input getter thread
-    pthread_create(&input_handler_thread,NULL, handleUserInput, NULL);
+    pthread_create(&input_handler_thread, NULL, handleUserInput, NULL);
 
 };
 
 void Client::getMessages()
 {
-    int read_bytes = -1;                // Number of bytes
+    int read_bytes = -1;                // Number of bytes read from the header
+    int payload_bytes = 0;              // Number of bytes read from the payload
     char server_message[PACKET_MAX];    // Buffer for message sent from server
     message_record* received_message;   // Pointer to a message record, used to decode received packet payload
+    packet* received_packet;
+
+    std::string chat_message; // Final composed chat message string, printed to the interface
+    std::string username;   // Name of the user who sent the message
 
     // Clear buffer to receive new packets
     for (int i=0; i < PACKET_MAX; i++) server_message[i] = '\0';
-    
+
     // Wait for messages from the server
-    // TODO Change from recv to non blocking option or find a way to stop safely
-    while(!stop_issued && (read_bytes = recv(server_socket, server_message, PACKET_MAX, 0)) > 0)
+    while(!stop_issued && (read_bytes = recv(server_socket, server_message, sizeof(packet), 0)) > 0)
     {
         // Decode message into packet format
-        packet* received_packet = (packet*)server_message;
+        received_packet = (packet*)server_message;
 
+        // Wait for the entire message to arrive
+        while (payload_bytes < received_packet->length) 
+        {
+            payload_bytes += recv(server_socket, server_message + read_bytes, received_packet->length - payload_bytes, 0);
+        }
+        
+        // Try to read the rest of the payload from the socket stream
         switch(received_packet->type)
         {
             case PAK_DAT: // Data packet (messages)
-            
+
                 // Decode payload into a message record
                 received_message = (message_record*)received_packet->_payload;
 
-                // Check if this message was sent by the connected user
+                // If message was sent by this user, change display name to "You"
                 if (strcmp(received_message->username, this->username.c_str()) == 0)
-                    printf("Received msg");
+                {
+                    sprintf(received_message->username,"%s","You");
+                }
+                // If not, add brackets to display name: [username]
+                else
+                {
+                    username = std::string("[") + received_message->username + "]";
+                    sprintf(received_message->username,"%s",username.c_str());
+                }
+
+                // Display message
+                chat_message = std::ctime((time_t*)&received_message->timestamp) + std::string(" ") + received_message->username + ": " + received_message->_message;
+                ClientInterface::printMessage(chat_message);
 
                 break;
             case PAK_CMD: // Command packet (disconnect)
 
-                // Show message sent from the server to user
-                std::cout << "\n" << received_packet->_payload << std::endl;
-                
+                ClientInterface::printMessage(received_packet->_payload);
+
                 // Stop the client application
                 stop_issued = true;
                 read_bytes = 0;
@@ -102,12 +130,15 @@ void Client::getMessages()
                 break;
 
             default: // Unknown packet 
-                std::cout << "\nReceived unknown packet type from server: " << received_packet->type << std::endl;
+                ClientInterface::printMessage("Received unkown packet from server");
                 break;
         }
 
         // Clear buffer to receive new packets
         for (int i=0; i < PACKET_MAX; i++) server_message[i] = '\0';
+
+        // Reset number of bytes read from payload
+        payload_bytes = 0;
     }
     // If server closes connection
     if (read_bytes == 0)
@@ -126,16 +157,21 @@ void *Client::handleUserInput(void* arg)
     fflush(stdin);
 
     // Get user messages to be sent until Ctrl D is pressed
-    std::string user_message;
+    char user_message[MESSAGE_MAX];
     do
     {
-        
-        std::cout << "Say something: ";
+        // Get user message
+        // TODO Detect Ctrl D press instead of Ctrl C
+        getstr(user_message);
         try
         {
+            // Reset input area below the screen
+            ClientInterface::resetInput();
+            
             // Don't send empty messages
-            if (!user_message.empty())
-                sendMessagePacket(user_message);
+            if (strlen(user_message) > 0)
+                sendMessagePacket(std::string(user_message));
+
         }
         catch(const std::runtime_error& e)
         {
@@ -143,7 +179,7 @@ void *Client::handleUserInput(void* arg)
         }
         
     }
-    while(!stop_issued && std::getline(std::cin, user_message));
+    while(!stop_issued);
 
     // Signal server-litening thread to stop
     stop_issued = true;
