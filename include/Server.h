@@ -13,8 +13,9 @@
 #include "data_types.h"
 #include "constants.h"
 #include "RW_Monitor.h"
+#include "BaseSocket.h"
 
-class Server
+class Server : private BaseSocket
 {
     // Private attributes
     private:
@@ -24,7 +25,7 @@ class Server
 
     static std::atomic<bool> stop_issued; // Atomic thread for stopping all threads
     int server_socket;  // Socket the server listens at for new incoming connections
-    
+
     struct sockaddr_in server_address;  // Server socket address
     struct sockaddr_in client_address;  // Client socket address
     static int message_history;    // Amount of old group messages to show clients

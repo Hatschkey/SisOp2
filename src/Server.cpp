@@ -43,7 +43,7 @@ void Server::listenConnections()
     int client_socket = -1;
     // Set passive listen socket
     if ( listen(server_socket, 3) < 0)
-        throw std::runtime_error("Error setting socket as passive listener");
+        throw std::runtime_error(appendErrorMessage("Error setting socket as passive listener"));
 
     // Spawn thread for listening to administrator commands
     pthread_create(&command_handler_thread, NULL, handleCommands, NULL);
@@ -270,7 +270,7 @@ void Server::setupConnection()
 {
     // Create socket
     if ( (server_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-        throw std::runtime_error("Error during socket creation");
+        throw std::runtime_error(appendErrorMessage("Error during socket creation"));
 
     // Prepare server socket address
     server_address.sin_family = AF_INET;
@@ -280,11 +280,11 @@ void Server::setupConnection()
     // Set socket options
     int yes = 1;
     if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1)
-        throw std::runtime_error("Error setting socket options");
+        throw std::runtime_error(appendErrorMessage("Error setting socket options"));
 
     // Bind socket
     if ( bind(server_socket, (struct sockaddr *)&server_address, sizeof(server_address)) < 0)
-        throw std::runtime_error("Error during socket bind");
+        throw std::runtime_error(appendErrorMessage("Error during socket bind"));
     
 }
 
@@ -318,7 +318,7 @@ int Server::sendPacket(int socket, int packet_type, char* payload, int payload_s
 
     // Send packet
     if ( (bytes_sent = send(socket, data, packet_size, 0)) <= 0)
-        throw std::runtime_error("Unable to send message to server");
+        throw std::runtime_error(appendErrorMessage("Unable to send message to server"));
 
     // Free memory used for packet
     free(data);

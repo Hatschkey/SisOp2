@@ -49,7 +49,7 @@ void Client::setupConnection()
 {
     // Create socket
     if ( (server_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-        throw std::runtime_error("Error during socket creation");
+        throw std::runtime_error(appendErrorMessage("Error during socket creation"));
     
     // Fill server socket address
     server_address.sin_family = AF_INET;           
@@ -58,7 +58,7 @@ void Client::setupConnection()
    
     // Try to connect to remote server
     if (connect(server_socket, (struct sockaddr *)&server_address, sizeof(server_address)) < 0)
-        throw std::runtime_error("Error connecting to server");
+        throw std::runtime_error(appendErrorMessage("Error connecting to server"));
 
     // Send the first packet for login
     sendLoginPacket();
@@ -216,7 +216,7 @@ int Client::sendLoginPacket()
 
     // Send packet
     if ( (bytes_sent = send(server_socket, login_packet, packet_size, 0)) <= 0)
-        throw std::runtime_error("Unable to send login packet to server");
+        throw std::runtime_error(appendErrorMessage("Unable to send login packet to server"));
     
     // Free memory used for packet
     free(login_packet);
@@ -248,7 +248,7 @@ int Client::sendMessagePacket(std::string message)
 
     // Send packet
     if ( (bytes_sent = send(server_socket, data, packet_size, 0)) <= 0)
-        throw std::runtime_error("Unable to send message to server");
+        throw std::runtime_error(appendErrorMessage("Unable to send message to server"));
 
     // Free memory used for packet
     free(data);
