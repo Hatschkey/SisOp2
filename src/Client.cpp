@@ -46,8 +46,6 @@ Client::~Client()
 
 void Client::setupConnection()
 {
-    int payload_size; // Payload size for the first packet(login)
-
     // Create socket
     if ( (server_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0)
         throw std::runtime_error(appendErrorMessage("Error during socket creation"));
@@ -61,14 +59,8 @@ void Client::setupConnection()
     if (connect(server_socket, (struct sockaddr *)&server_address, sizeof(server_address)) < 0)
         throw std::runtime_error(appendErrorMessage("Error connecting to server"));
 
-    // Prepare login content payload
-    login_payload lp;
-    sprintf(lp.username, "%s", username.c_str());
-    sprintf(lp.groupname, "%s", groupname.c_str());
-    payload_size = sizeof(lp);
-
-    // Sends the command packet to the server
-    BaseSocket::sendPacket(server_socket, PAK_CMD, (char*)&lp, payload_size); 
+    // Send the first packet for login
+    sendLoginPacket();
 
     // Start user input getter thread
     pthread_create(&input_handler_thread, NULL, handleUserInput, NULL);
@@ -157,8 +149,6 @@ void Client::getMessages()
 
 void *Client::handleUserInput(void* arg)
 {
-    int payload_size;
-
     // Flush stdin so no empty message is sent
     fflush(stdin);
 
@@ -175,13 +165,9 @@ void *Client::handleUserInput(void* arg)
             ClientInterface::resetInput();
 
             // Don't send empty messages
-            if (strlen(user_message) > 0) 
-            {
-                // Prepare message payload
-                char* payload = user_message + '\0';
-                payload_size = strlen(payload) + 1;
-                BaseSocket::sendPacket(server_socket, PAK_DAT, payload, payload_size);
-            }
+            if (strlen(user_message) > 0)
+                sendMessagePacket(std::string(user_message));
+
         }
         catch(const std::runtime_error& e)
         {
@@ -199,4 +185,70 @@ void *Client::handleUserInput(void* arg)
 
     // End with no return value
     pthread_exit(NULL);
+};
+
+int Client::sendLoginPacket()
+{
+    int payload_size = -1; // Size of login payload
+    int packet_size = -1;  // Size of packet to be sent
+    int bytes_sent = -1;   // Number of bytes sent to the remote server
+
+    // Prepare login content payload
+    login_payload lp;
+    sprintf(lp.username, "%s", username.c_str());
+    sprintf(lp.groupname, "%s", groupname.c_str());
+    payload_size = sizeof(lp);
+
+    // Prepare packet
+    packet* login_packet = (packet*)malloc(sizeof(*login_packet) + sizeof(char) * payload_size);
+    login_packet->type      = PAK_CMD; // Signal that a command packet is being sent
+    login_packet->sqn       = 0;       // Sequence number is 0 for the first packet
+    login_packet->timestamp = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()); // Current timestamp
+    login_packet->length    = payload_size; // Update payload size
+    memcpy((void*)login_packet->_payload, (void*)&lp, payload_size);  // Load login payload
+
+    // Calculate packet size
+    packet_size = sizeof(*login_packet) +  payload_size;
+
+    // Send packet
+    if ( (bytes_sent = send(server_socket, login_packet, packet_size, 0)) <= 0)
+        throw std::runtime_error(appendErrorMessage("Unable to send login packet to server"));
+
+    // Free memory used for packet
+    free(login_packet);
+
+    // Return number of bytes sent
+    return bytes_sent;
+};
+
+int Client::sendMessagePacket(std::string message)
+{
+    int payload_size = -1; // Size of login payload
+    int packet_size = -1;  // Size of packet to be sent
+    int bytes_sent = -1;   // Number of bytes sent to the remote server
+
+    // Prepare message payload
+    const char* payload = message.c_str();
+    payload_size = strlen(payload) + 1;
+
+    // Prepare packet
+    packet* data = (packet*)malloc(sizeof(*data) + sizeof(char) * payload_size);
+    data->type      = PAK_DAT; // Signal that a data packet is being sent
+    data->sqn       = 1; // TODO Keep track of the packet sequence numbers
+    data->timestamp = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()); // Current timestamp
+    data->length = payload_size;    // Upload payload size
+    sprintf((char*)data->_payload, "%s",payload); // Load message payload
+
+    // Calculate packet size
+    packet_size = sizeof(*data) + (sizeof(char) * payload_size);
+
+    // Send packet
+    if ( (bytes_sent = send(server_socket, data, packet_size, 0)) <= 0)
+        throw std::runtime_error(appendErrorMessage("Unable to send message to server"));
+
+    // Free memory used for packet
+    free(data);
+
+    // Return number of bytes sent
+    return bytes_sent;
 };
