@@ -15,7 +15,7 @@
 #include "RW_Monitor.h"
 #include "BaseSocket.h"
 
-class Server : private BaseSocket
+class Server : protected BaseSocket
 {
     // Private attributes
     private:
@@ -85,15 +85,4 @@ class Server : private BaseSocket
      * assigned to
      */
     static void listThreads();
-
-    /**
-     * Sends a packet with given payload to the provided socket descriptor
-     * @param socket Socket descriptor where the packet will be sent
-     * @param packet_type Type of packet that should be sent (see constants.h)
-     * @param payload Data that will be sent through that socket
-     * @param payload_size Size of the data provided in payload
-     * @returns Number of bytes sent
-     */
-    static int sendPacket(int socket, int packet_type, char* payload, int payload_size);
-
 };
