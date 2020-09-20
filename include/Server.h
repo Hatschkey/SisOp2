@@ -34,7 +34,7 @@ class Server : protected BaseSocket
     static int message_history;    // Amount of old group messages to show clients
 
     pthread_t command_handler_thread; // Thread for handling server
-    static std::map<int, pthread_t> connection_handler_threads; // Threads for handling client connections
+    static std::map<int, pthread_t> connection_handler_threads; // Socket descriptor and threads for handling client connections
     static RW_Monitor threads_monitor;  // Monitor for connection handler threads list
 
     // Public methods

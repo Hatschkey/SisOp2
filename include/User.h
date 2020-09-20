@@ -4,16 +4,18 @@
 #include <string>
 #include <chrono>
 #include <vector>
+#include <pthread.h>
 
 #include "constants.h"
 #include "data_types.h"
 #include "Group.h"
 #include "RW_Monitor.h"
+#include "BaseSocket.h"
 
 // Forward declare Group
 class Group;
 
-class User
+class User : protected BaseSocket
 {
     public:
     static std::map<std::string, User*> active_users;   // Current active users
@@ -23,6 +25,9 @@ class User
     int last_seen; // Last time a message was received from this user
     std::map<std::string, int> joined_groups; // Groups this user instance has joined and how many sessions are active in each group
     RW_Monitor joined_groups_monitor;   // Monitor for joined groups
+
+    std::map<int, std::string> group_sockets; // Map for group and sockets related to that group (Max MAX_SESSIONS)
+    RW_Monitor group_sockets_monitor;  // Monitor for group to socket id map
 
     /**
      * Searches for the given username in the currently active users list.
@@ -66,15 +71,17 @@ class User
     /**
      * Tries to join the given group, if the session count allows for it
      * @param group Instance of a Group class
+     * @param socket_id Identifier for the socket corresponding to the session thread
      * @return 1 if join was successful, 0 if it wasn't
      */
-    int joinGroup(Group* group);
+    int joinGroup(Group* group, int socket_id);
 
     /**
      * Tries to leave the given group
      * @param group Instance of the group the user wishes to leave
+     * @param socket_id Identifier for the socket corresponding to the finishing thread
      */
-    void leaveGroup(Group* group);
+    void leaveGroup(Group* group, int socket_id);
 
     /**
      * Sends a message said by this user to the group
@@ -83,6 +90,17 @@ class User
      * @return Number of users this message was sent to, should always be at least 1 (the sender) on success
      */
     int say(std::string message, std::string groupname);
+
+
+    /**
+     * Signals the user instance that a new message has arrived to the group
+     * The user instance then signals the corresponding client threads to send packets
+     * @param message Text message that will be sent to the clients
+     * @param username Username of the user who posted this message
+     * @param groupname Groupname of the group where the message was posted
+     * @returns 
+     */
+    int signalNewMessage(std::string message, std::string username, std::string groupname);
 };
 
 #endif

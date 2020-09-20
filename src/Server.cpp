@@ -153,14 +153,14 @@ void *Server::handleConnection(void* arg)
         // Decode received data into a packet structure
         packet* received_packet = (packet *)client_message;
 
-        std::cout << "Received packet of type " << received_packet->type << " with " << read_bytes << " bytes" << std::endl;
+        //std::cout << "Received packet of type " << received_packet->type << " with " << read_bytes << " bytes" << std::endl;
 
         // Decide action according to packet type
         switch (received_packet->type)
         {
             case PAK_DAT:   // Data packet
                 // Debug
-                std::cout << "[" << user->username << " @ " << group->groupname << "] says: " << received_packet->_payload << std::endl;
+                //std::cout << "[" << user->username << " @ " << group->groupname << "] says: " << received_packet->_payload << std::endl;
 
                 // Say the message to the group
                 if (user != NULL && group != NULL)
@@ -172,7 +172,7 @@ void *Server::handleConnection(void* arg)
                 login_payload_buffer = (login_payload*)received_packet->_payload;
 
                 // TODO Debug messages
-                std::cout << "Received login packet from " << login_payload_buffer->username << " @ " << login_payload_buffer-> groupname << std::endl;
+                //std::cout << "Received login packet from " << login_payload_buffer->username << " @ " << login_payload_buffer-> groupname << std::endl;
 
                 // Check if this group is already active, and create one if not
                 if ( (group = Group::getGroup(login_payload_buffer->groupname)) == NULL)
@@ -183,7 +183,7 @@ void *Server::handleConnection(void* arg)
                     user = new User(login_payload_buffer->username);
 
                 // Try to join that group with this user
-                if (user->joinGroup(group) != 0)
+                if (user->joinGroup(group, socket) != 0)
                 {
                     // Recover message history for this user
                     read_messages = group->recoverHistory(message_records, Server::message_history, user);
@@ -223,7 +223,7 @@ void *Server::handleConnection(void* arg)
                 break;
 
             default:
-                std::cerr << "Unknown packet type received" << std::endl;
+                //std::cerr << "Unknown packet type received" << std::endl;
                 break;
         }
 
@@ -236,10 +236,10 @@ void *Server::handleConnection(void* arg)
     }
 
     // Debug message
-    std::cout << "[" << user->username << " @ " << group->groupname << "] disconnected" << std::endl;
+    //std::cout << "[" << user->username << " @ " << group->groupname << "] disconnected" << std::endl;
 
     // Leave group with this user
-    user->leaveGroup(group);
+    user->leaveGroup(group, socket);
 
     // Free received argument
     free(arg);

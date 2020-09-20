@@ -200,6 +200,7 @@ int Group::getUserCount()
 
 int Group::post(std::string message, std::string username)
 {
+    int sent_messages = 0; // Number of messages that were sent
 
     // Save this message
     this->saveMessage(message, username);
@@ -210,15 +211,15 @@ int Group::post(std::string message, std::string username)
     // Send message to every connected user (Including message sender)
     for (std::map<std::string, User*>::iterator i = users.begin(); i != users.end(); ++i)
     {
-        // TODO Placeholder debug message
-        std::cout << "TODO Send message to " << i->second->username << std::endl;
+        // Signal each user instance in the group that a new message was posted
+        sent_messages += i->second->signalNewMessage(message, username, this->groupname);
     }
 
     // Release read rights
     users_monitor.releaseRead();
 
-    // TODO Change here to return the amount of messages that were issued
-    return this->getUserCount();
+    // Return the amount of messages that were issued
+    return sent_messages;
 }
 
 void Group::saveMessage(std::string message, std::string username)
