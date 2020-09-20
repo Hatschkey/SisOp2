@@ -12,10 +12,11 @@
 
 #include "constants.h"
 #include "data_types.h"
+#include "BaseSocket.h"
 
 #include "ClientInterface.h"
 
-class Client
+class Client : private BaseSocket
 {
     // Private attributes
     private:
