@@ -16,7 +16,7 @@
 
 #include "ClientInterface.h"
 
-class Client : private BaseSocket
+class Client : protected BaseSocket
 {
     // Private attributes
     private:

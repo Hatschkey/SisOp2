@@ -35,13 +35,13 @@ ${OBJ_DIR}User.o:
 ${OBJ_DIR}RW_Monitor.o:
 	${CC} -c ${SRC_DIR}RW_Monitor.cpp -I ${INC_DIR} -o ${OBJ_DIR}RW_Monitor.o -Wall
 
-${OBJ_DIR}ClientInterface.o:
+${OBJ_DIR}ClientInterface.o: ${SRC_DIR}ClientInterface.cpp ${INC_DIR}ClientInterface.h
 	${CC} -c ${SRC_DIR}ClientInterface.cpp -I ${INC_DIR} -o ${OBJ_DIR}ClientInterface.o -Wall
 
-${OBJ_DIR}BaseSocket.o:
+${OBJ_DIR}BaseSocket.o: ${SRC_DIR}BaseSocket.cpp ${INC_DIR}BaseSocket.h
 	${CC} -c ${SRC_DIR}BaseSocket.cpp -I ${INC_DIR} -o ${OBJ_DIR}BaseSocket.o -Wall
 
-dirs:
+dirs: 
 	mkdir -p ${OBJ_DIR}
 	mkdir -p ${BIN_DIR}
 	mkdir -p ${HIST_DIR}
@@ -54,4 +54,3 @@ run_server: ${BIN_DIR}server
 
 run_client: ${BIN_DIR}client
 	cd ${BIN_DIR} && ./client user group 127.0.0.1 6789
-
