@@ -68,19 +68,6 @@ class Client : protected BaseSocket
      * This should run in a separate thread to getMessages
      */
     static void *handleUserInput(void* arg);
-
-    /**
-     * Send packet to server with login information (User and Group)
-     * @return Number of bytes sent to remote server
-     */
-    int sendLoginPacket();
-
-    /**
-     * Send packet to server with a chat message
-     * @param message Message to be sent to the chatroom
-     * @return Number of bytes sent to remote server
-     */
-    static int sendMessagePacket(std::string message);
 };
 
 #endif
