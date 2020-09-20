@@ -1,3 +1,6 @@
+#ifndef BASESOCKET_H
+#define BASESOCKET_H
+
 #include <sys/socket.h>
 #include <string>
 #include <cstring>
@@ -22,3 +25,5 @@ class BaseSocket {
      */
     static int sendPacket(int socket, int packet_type, char* payload, int payload_size);
 };
+
+#endif

@@ -42,7 +42,6 @@ Client::~Client()
     // Close server socket if it is still open
     if (server_socket > 0)
         close(server_socket);
-
 };
 
 void Client::setupConnection()
@@ -50,12 +49,12 @@ void Client::setupConnection()
     // Create socket
     if ( (server_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0)
         throw std::runtime_error(appendErrorMessage("Error during socket creation"));
-    
+
     // Fill server socket address
-    server_address.sin_family = AF_INET;           
+    server_address.sin_family = AF_INET;
     server_address.sin_port   = htons(server_port);
     server_address.sin_addr.s_addr = inet_addr(server_ip.c_str());
-   
+
     // Try to connect to remote server
     if (connect(server_socket, (struct sockaddr *)&server_address, sizeof(server_address)) < 0)
         throw std::runtime_error(appendErrorMessage("Error connecting to server"));
@@ -65,7 +64,6 @@ void Client::setupConnection()
 
     // Start user input getter thread
     pthread_create(&input_handler_thread, NULL, handleUserInput, NULL);
-
 };
 
 void Client::getMessages()
@@ -89,11 +87,11 @@ void Client::getMessages()
         received_packet = (packet*)server_message;
 
         // Wait for the entire message to arrive
-        while (payload_bytes < received_packet->length) 
+        while (payload_bytes < received_packet->length)
         {
             payload_bytes += recv(server_socket, server_message + read_bytes, received_packet->length - payload_bytes, 0);
         }
-        
+
         // Try to read the rest of the payload from the socket stream
         switch(received_packet->type)
         {
@@ -117,8 +115,8 @@ void Client::getMessages()
                 // Display message
                 chat_message = std::ctime((time_t*)&received_message->timestamp) + std::string(" ") + received_message->username + ": " + received_message->_message;
                 ClientInterface::printMessage(chat_message);
-
                 break;
+
             case PAK_CMD: // Command packet (disconnect)
 
                 ClientInterface::printMessage(received_packet->_payload);
@@ -126,10 +124,9 @@ void Client::getMessages()
                 // Stop the client application
                 stop_issued = true;
                 read_bytes = 0;
-
                 break;
 
-            default: // Unknown packet 
+            default: // Unknown packet
                 ClientInterface::printMessage("Received unkown packet from server");
                 break;
         }
@@ -148,7 +145,6 @@ void Client::getMessages()
 
     // Wait for thread to finish
     pthread_join(Client::input_handler_thread,NULL);
-
 };
 
 void *Client::handleUserInput(void* arg)
@@ -167,7 +163,7 @@ void *Client::handleUserInput(void* arg)
         {
             // Reset input area below the screen
             ClientInterface::resetInput();
-            
+
             // Don't send empty messages
             if (strlen(user_message) > 0)
                 sendMessagePacket(std::string(user_message));
@@ -177,7 +173,7 @@ void *Client::handleUserInput(void* arg)
         {
             std::cerr << e.what() << std::endl;
         }
-        
+
     }
     while(!stop_issued);
 
@@ -203,11 +199,11 @@ int Client::sendLoginPacket()
     sprintf(lp.groupname, "%s", groupname.c_str());
     payload_size = sizeof(lp);
 
-    // Prepare packet 
+    // Prepare packet
     packet* login_packet = (packet*)malloc(sizeof(*login_packet) + sizeof(char) * payload_size);
     login_packet->type      = PAK_CMD; // Signal that a command packet is being sent
     login_packet->sqn       = 0;       // Sequence number is 0 for the first packet
-    login_packet->timestamp = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()); // Current timestamp 
+    login_packet->timestamp = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()); // Current timestamp
     login_packet->length    = payload_size; // Update payload size
     memcpy((void*)login_packet->_payload, (void*)&lp, payload_size);  // Load login payload
 
@@ -217,7 +213,7 @@ int Client::sendLoginPacket()
     // Send packet
     if ( (bytes_sent = send(server_socket, login_packet, packet_size, 0)) <= 0)
         throw std::runtime_error(appendErrorMessage("Unable to send login packet to server"));
-    
+
     // Free memory used for packet
     free(login_packet);
 
@@ -242,7 +238,7 @@ int Client::sendMessagePacket(std::string message)
     data->timestamp = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()); // Current timestamp
     data->length = payload_size;    // Upload payload size
     sprintf((char*)data->_payload, "%s",payload); // Load message payload
-    
+
     // Calculate packet size
     packet_size = sizeof(*data) + (sizeof(char) * payload_size);
 

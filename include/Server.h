@@ -1,3 +1,6 @@
+#ifndef SERVER_H
+#define SERVER_H
+
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
@@ -36,11 +39,11 @@ class Server : protected BaseSocket
 
     // Public methods
     public:
-    
+
     /**
      * Class constructor
      * Initializes server socket
-     * @param N Amount of old group messages that will be shown to clients upon joining 
+     * @param N Amount of old group messages that will be shown to clients upon joining
      */
     Server(int N);
 
@@ -51,13 +54,13 @@ class Server : protected BaseSocket
 
     /**
      * Listens for incoming connections from clients
-     * Upon receiving a connection, spawns a new thread to handle communication 
+     * Upon receiving a connection, spawns a new thread to handle communication
      */
     void listenConnections();
 
     // Private methods
     private:
-    
+
     /**
      * Lists all available administrator commands to stdout
      */
@@ -86,3 +89,5 @@ class Server : protected BaseSocket
      */
     static void listThreads();
 };
+
+#endif

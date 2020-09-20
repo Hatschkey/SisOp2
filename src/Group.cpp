@@ -12,7 +12,7 @@ Group::Group(std::string groupname)
 
     // Name of the group's history file
     std::string history_filename = groupname.append(".hist");
- 
+
     // Request write rights
     history_file_monitor.requestWrite();
 
@@ -39,7 +39,6 @@ Group::Group(std::string groupname)
 
 Group::~Group()
 {
-    
     // Request write rights
     history_file_monitor.releaseWrite();
 
@@ -68,7 +67,7 @@ Group* Group::getGroup(std::string groupname)
         // If reached end of map, group is not there
         group = NULL;
     }
-    
+
     // Release read rights
     Group::active_groups_monitor.releaseRead();
 
@@ -82,10 +81,9 @@ void Group::addGroup(Group* group)
 
     // Insert in group map
     active_groups.insert(std::make_pair(group->groupname, group));
-    
+
     // Release the write rights
     Group::active_groups_monitor.releaseWrite();
-
 }
 
 int Group::removeGroup(std::string groupname)
@@ -106,7 +104,6 @@ int Group::removeGroup(std::string groupname)
 
 void Group::listGroups()
 {
-
     // Request read rights
     Group::active_groups_monitor.requestRead();
 
@@ -184,7 +181,6 @@ void Group::listUsers()
 
     // Release read rights
     this->users_monitor.releaseRead();
-
 }
 
 int Group::getUserCount()
@@ -207,10 +203,10 @@ int Group::post(std::string message, std::string username)
 
     // Save this message
     this->saveMessage(message, username);
-    
+
     // Request read rights
     users_monitor.requestRead();
-    
+
     // Send message to every connected user (Including message sender)
     for (std::map<std::string, User*>::iterator i = users.begin(); i != users.end(); ++i)
     {
@@ -312,14 +308,14 @@ int Group::recoverHistory(char* message_record_list, int n, User* user)
             // If not, only jump to the next message
             fseek(hist, ((message_record*)header_buffer)->length,SEEK_CUR);
         }
-        
+
         // Increase current message
         current_message++;
 
         free(message);
 
         // Reset message buffer for reading new messages
-        for (int i=0; i < PACKET_MAX; i++) 
+        for (int i=0; i < PACKET_MAX; i++)
         {
             header_buffer[i] = '\0';
             message_buffer[i] = '\0';
@@ -335,4 +331,3 @@ int Group::recoverHistory(char* message_record_list, int n, User* user)
     // Return read messages
     return read_messages;
 }
-

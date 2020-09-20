@@ -1,12 +1,13 @@
+#ifndef CLIENTINTERFACE_H
+#define CLIENTINTERFACE_H
+
 #include <curses.h>
 #include <string>
 #include <cmath>
 
 class ClientInterface
 {
-
     private:
-    
         static std::string groupname; // Name of the group user is connected to
 
         static int max_lines;         // Line limit
@@ -14,7 +15,6 @@ class ClientInterface
         static int last_message_end;  // Line where the last message ended
 
     public:
-
         /**
          * Initialize client interface using the ncurses library
          */
@@ -41,3 +41,5 @@ class ClientInterface
          */
         static void resetInput();
 };
+
+#endif

@@ -1,3 +1,6 @@
+#ifndef CLIENT_H
+#define CLIENT_H
+
 #include <regex>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -41,7 +44,7 @@ class Client : protected BaseSocket
      * @param server_port Port the remote server is listening at
      */
     Client(std::string username, std::string groupname, std::string server_ip, std::string server_port);
- 
+
     /**
      * Class destructor
      * Closes communication socket with the remote server if one has been opened
@@ -71,12 +74,13 @@ class Client : protected BaseSocket
      * @return Number of bytes sent to remote server
      */
     int sendLoginPacket();
-    
+
     /**
      * Send packet to server with a chat message
      * @param message Message to be sent to the chatroom
      * @return Number of bytes sent to remote server
      */
     static int sendMessagePacket(std::string message);
-
 };
+
+#endif

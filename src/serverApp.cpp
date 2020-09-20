@@ -17,7 +17,6 @@ int main(int argc, char** argv)
 
         // Start listening to connections
         server.listenConnections();
-        
     }
     catch(const std::runtime_error& e)
     {

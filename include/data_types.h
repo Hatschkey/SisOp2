@@ -8,7 +8,7 @@
 // Packet that is sent between server and client
 typedef struct __packet
 {
-    uint16_t type;          // Packet type 
+    uint16_t type;          // Packet type
     uint16_t sqn;           // Sequence number
     uint16_t length;        // Message lenght
     uint64_t timestamp;     // Message timestamp

@@ -9,7 +9,7 @@ HIST_DIR := bin/hist/
 all: dirs ${BIN_DIR}client ${BIN_DIR}server
 
 ${BIN_DIR}server: ${OBJ_DIR}RW_Monitor.o ${OBJ_DIR}User.o ${OBJ_DIR}Group.o ${OBJ_DIR}serverApp.o ${OBJ_DIR}BaseSocket.o
-	${CC} ${OBJ_DIR}serverApp.o ${OBJ_DIR}Server.o ${OBJ_DIR}RW_Monitor.o ${OBJ_DIR}User.o ${OBJ_DIR}Group.o ${OBJ_DIR}BaseSocket.o -o ${BIN_DIR}server -lpthread -Wall    
+	${CC} ${OBJ_DIR}serverApp.o ${OBJ_DIR}Server.o ${OBJ_DIR}RW_Monitor.o ${OBJ_DIR}User.o ${OBJ_DIR}Group.o ${OBJ_DIR}BaseSocket.o -o ${BIN_DIR}server -lpthread -Wall
 
 ${BIN_DIR}client: ${OBJ_DIR}ClientInterface.o ${OBJ_DIR}clientApp.o ${OBJ_DIR}BaseSocket.o
 	${CC} ${OBJ_DIR}ClientInterface.o ${OBJ_DIR}clientApp.o ${OBJ_DIR}Client.o ${OBJ_DIR}BaseSocket.o -o ${BIN_DIR}client -lncurses -lpthread -Wall
@@ -41,7 +41,7 @@ ${OBJ_DIR}ClientInterface.o: ${SRC_DIR}ClientInterface.cpp ${INC_DIR}ClientInter
 ${OBJ_DIR}BaseSocket.o: ${SRC_DIR}BaseSocket.cpp ${INC_DIR}BaseSocket.h
 	${CC} -c ${SRC_DIR}BaseSocket.cpp -I ${INC_DIR} -o ${OBJ_DIR}BaseSocket.o -Wall
 
-dirs: 
+dirs:
 	mkdir -p ${OBJ_DIR}
 	mkdir -p ${BIN_DIR}
 	mkdir -p ${HIST_DIR}

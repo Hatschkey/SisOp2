@@ -1,11 +1,10 @@
 #include "Client.h"
 
-/* 
- * Client entrypoint 
+/*
+ * Client entrypoint
  */
 int main(int argc, char** argv)
 {
-
     // Parse command line input
     if (argc < 5){
         std::cerr << "Usage: " << argv[0] << " <username> <groupname> <server_ip_address> <port> " << std::endl;
@@ -22,7 +21,6 @@ int main(int argc, char** argv)
 
         // Start listening for the server
         client.getMessages();
-        
     }
     catch(const std::invalid_argument& e)
     {

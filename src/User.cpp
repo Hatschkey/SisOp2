@@ -20,7 +20,7 @@ User* User::getUser(std::string username)
         // If reached end of map, user is not there
         user = NULL;
     }
-        
+
     // Release read rights
     active_users_monitor.releaseRead();
 
@@ -64,7 +64,7 @@ void User::listUsers()
         std::cout << "Active sessions: " << i->second->getSessionCount() << std::endl;
         std::cout << "Last seen: " << std::ctime((time_t*)&(i->second->last_seen)) << std::endl;
     }
-    
+
     // Release read rights
     active_users_monitor.releaseRead();
 }
@@ -77,7 +77,6 @@ User::User(std::string username)
 
     // Add itself to the active user list
     User::addUser(this);
-
 }
 
 int User::getSessionCount()
@@ -101,7 +100,7 @@ int User::getSessionCount()
 
 int User::joinGroup(Group* group)
 {
-    // Check for user session count 
+    // Check for user session count
     if (this->getSessionCount() < MAX_SESSIONS)
     {
         // Add user to group
@@ -111,7 +110,7 @@ int User::joinGroup(Group* group)
         joined_groups_monitor.requestWrite();
 
         // Check if this user is already connected to this group
-        if (this->joined_groups.find(group->groupname) == this->joined_groups.end()) 
+        if (this->joined_groups.find(group->groupname) == this->joined_groups.end())
         {
             // If not, add it with 1 session
             this->joined_groups.insert(std::make_pair(group->groupname, 1));
@@ -171,18 +170,16 @@ void User::leaveGroup(Group* group)
             // Release write rights
             joined_groups_monitor.releaseWrite();
         }
-        
     }
     else
     {
         // Release write rights
         joined_groups_monitor.releaseWrite();
-    }  
+    }
 }
 
 int User::say(std::string message, std::string groupname)
 {
-
     // Fetch the group
     Group* group = Group::getGroup(groupname);
 
@@ -192,4 +189,3 @@ int User::say(std::string message, std::string groupname)
 
     return 0;
 }
-

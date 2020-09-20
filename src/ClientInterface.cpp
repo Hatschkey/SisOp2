@@ -24,7 +24,7 @@ void ClientInterface::init(std::string group)
 
     // Print the UI components
     ClientInterface::printUI();
-}   
+}
 
 void ClientInterface::destroy()
 {
@@ -34,8 +34,7 @@ void ClientInterface::destroy()
 
 void ClientInterface::printMessage(std::string message)
 {
-
-    int message_line_count = 1 + (int)ceil((float)message.length()/max_columns); // Calculate amount of lines this message occupies 
+    int message_line_count = 1 + (int)ceil((float)message.length()/max_columns); // Calculate amount of lines this message occupies
 
     // Save old x and y cursor pos
     int old_cursor_x;
@@ -47,17 +46,16 @@ void ClientInterface::printMessage(std::string message)
     {
         // If so, clear the screen to make space for it
         // TODO Maybe try to do some sort of scroll afterwards?
-
     }
     else
     {
         // If not, just print the message to the screen
         mvaddstr(ClientInterface::last_message_end, 0, message.c_str());
     }
-    
+
     // Refresh screen
-    refresh();  
-    
+    refresh();
+
     // Increase last message end
     ClientInterface::last_message_end += message_line_count;
 

@@ -16,10 +16,8 @@ class User;
 
 class Group
 {
-
-    public: 
-
-    static std::map<std::string, Group*> active_groups;  // Current active groups 
+    public:
+    static std::map<std::string, Group*> active_groups;  // Current active groups
     static RW_Monitor active_groups_monitor;             // Monitor for the group list variable
 
     std::string groupname;                  // Name for this group instance
@@ -35,30 +33,30 @@ class Group
      * @return Reference to the group structure in the group list
      */
     static Group* getGroup(std::string groupname);
-    
+
     /**
      * Add group to currently active group list
      * @param group Pointer to the group that will be added to the list
      */
     static void addGroup(Group* group);
-    
+
     /**
      * Remove specified group
      * @param groupname Name of the group that should be removed from this list
      * @return Number of removed groups, should always be either 1 or 0
      */
     static int removeGroup(std::string groupname);
-    
+
     /**
      * Debug function, lists all active groups and their current users
      */
-    static void listGroups(); 
+    static void listGroups();
 
     // These non-static methods are related to an instance of group
 
     /**
      * Class constructor
-     * @param groupname Name of the group that will be created 
+     * @param groupname Name of the group that will be created
      */
     Group(std::string groupname);
 
@@ -68,14 +66,14 @@ class Group
     ~Group();
 
     /**
-     * Add given user to group 
+     * Add given user to group
      * @param user User to be added to this group
      */
     void addUser(User* user);
 
     /**
      * Remove the user corresponding to the given username
-     * @param username Name of the user that should be removed from this group 
+     * @param username Name of the user that should be removed from this group
      * @return Number of deleted users, should always be either 1 or 0
      */
     int removeUser(std::string username);
@@ -86,7 +84,7 @@ class Group
     void listUsers();
 
     /**
-     * Gets current user count for this group 
+     * Gets current user count for this group
      * @returns Current user count
      */
     int getUserCount();
@@ -101,7 +99,7 @@ class Group
     int post(std::string message, std::string username);
 
     /**
-     * Creates and saves the given message to this groups history file. 
+     * Creates and saves the given message to this groups history file.
      * TODO This method should be mutex protected (No other threads should read or write to the file concurrently)
      * @param message  Message that will be saved
      * @param username User who sent this message
@@ -110,7 +108,7 @@ class Group
 
     /**
      * Recovers the last N messages from the group's history file, sending them to the user
-     * @param message_record_list Buffer for reading recorded messages history 
+     * @param message_record_list Buffer for reading recorded messages history
      * @param n    Number of messages that will be recovered
      * @param user Pointer to the user instance that will receive these messages
      * @return Number of recorded messages retrieved from the grupo.hist file

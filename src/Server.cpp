@@ -12,7 +12,6 @@ RW_Monitor Server::threads_monitor;
 
 Server::Server(int N)
 {
-    // Validate N
     if (N <= 0)
         throw std::runtime_error("Invalid N, must be > 0");
 
@@ -26,7 +25,7 @@ Server::Server(int N)
     available_commands.insert(std::make_pair("list groups", &Group::listGroups));
     available_commands.insert(std::make_pair("list threads",&Server::listThreads));
     available_commands.insert(std::make_pair("help", &Server::listCommands));
-    
+
     // Setup socket
     setupConnection();
 }
@@ -35,7 +34,6 @@ Server::~Server()
 {
     // Close opened sockets
     close(server_socket);
-    //close(client_socket);
 }
 
 void Server::listenConnections()
@@ -59,14 +57,14 @@ void Server::listenConnections()
     while(!stop_issued && (client_socket = accept(server_socket, (struct sockaddr*)&client_address, (socklen_t*)&sockaddr_size)) )
     {
         //std::cout << "New connection accepted from client " << client_socket << std::endl;
-        
+
         // Start new thread for new connection
         pthread_t comm_thread;
-        
+
         // Get reference to client socket
         new_socket = (int*)malloc(sizeof(int));
         *new_socket = client_socket;
-        
+
         // Spawn new thread for handling that client
         if (pthread_create( &comm_thread, NULL, handleConnection, (void*)new_socket) < 0)
         {
@@ -77,18 +75,17 @@ void Server::listenConnections()
 
         // Request write rights
         threads_monitor.requestWrite();
-         
+
         // Add thread to list of connection handlers
         connection_handler_threads.insert(std::make_pair(*new_socket, comm_thread));
 
         // Release write rights
         threads_monitor.releaseWrite();
-
     }
 
     // Request read rights
     threads_monitor.requestRead();
-    
+
     // Wait for all threads to finish
     for (std::map<int, pthread_t>::iterator i = connection_handler_threads.begin(); i != connection_handler_threads.end(); ++i)
     {
@@ -99,7 +96,6 @@ void Server::listenConnections()
 
     // Release read rights
     threads_monitor.releaseRead();
-
 }
 
 void Server::listCommands()
@@ -122,13 +118,11 @@ void *Server::handleCommands(void* arg)
         {
             // Execute administrator command
             available_commands.at(command)();
-            
         }
         catch(std::out_of_range& e)
         {
             std::cout << "Unknown command: " << command << std::endl;
         }
-
     }
 
     // Signal all other threads to end
@@ -139,7 +133,6 @@ void *Server::handleCommands(void* arg)
 
 void *Server::handleConnection(void* arg)
 {
-
     int            socket = *(int*)arg;         // Client socket
     int            read_bytes = -1;             // Number of bytes read from the message
     char           client_message[PACKET_MAX];  // Buffer for client message, maximum of PACKET_MAX bytes
@@ -159,27 +152,25 @@ void *Server::handleConnection(void* arg)
     {
         // Decode received data into a packet structure
         packet* received_packet = (packet *)client_message;
-        
+
         std::cout << "Received packet of type " << received_packet->type << " with " << read_bytes << " bytes" << std::endl;
 
         // Decide action according to packet type
         switch (received_packet->type)
         {
             case PAK_DAT:   // Data packet
-
                 // Debug
                 std::cout << "[" << user->username << " @ " << group->groupname << "] says: " << received_packet->_payload << std::endl;
-                
+
                 // Say the message to the group
                 if (user != NULL && group != NULL)
                     user->say(received_packet->_payload, group->groupname);
-
                 break;
-            case PAK_CMD:   // Command packet (login)
 
-                // Get user login information         
+            case PAK_CMD:   // Command packet (login)
+                // Get user login information
                 login_payload_buffer = (login_payload*)received_packet->_payload;
-                
+
                 // TODO Debug messages
                 std::cout << "Received login packet from " << login_payload_buffer->username << " @ " << login_payload_buffer-> groupname << std::endl;
 
@@ -202,7 +193,7 @@ void *Server::handleConnection(void* arg)
                         read_message = (message_record*)(message_records + offset);
 
                         memcpy(server_message, message_records + offset, sizeof(message_record) + read_message->length);
-                    
+
                         sendPacket(socket, PAK_DAT, server_message, sizeof(message_record) + ((message_record*)server_message)->length);
 
                         //std::cout << ((message_record*)server_message)->username << std::endl;
@@ -229,8 +220,8 @@ void *Server::handleConnection(void* arg)
                     // Exit
                     pthread_exit(NULL);
                 }
-
                 break;
+
             default:
                 std::cerr << "Unknown packet type received" << std::endl;
                 break;
@@ -285,7 +276,6 @@ void Server::setupConnection()
     // Bind socket
     if ( bind(server_socket, (struct sockaddr *)&server_address, sizeof(server_address)) < 0)
         throw std::runtime_error(appendErrorMessage("Error during socket bind"));
-    
 }
 
 void Server::listThreads()

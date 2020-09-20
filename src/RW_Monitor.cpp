@@ -24,7 +24,7 @@ void RW_Monitor::releaseRead()
     num_readers--;
 
     // If no readers are left, notify the writer thread
-    if (num_readers == 0) 
+    if (num_readers == 0)
     {
         //write_lock.unlock();    // Unlock the writer lock
         ok_write.notify_one();  // Signal any writer thread
@@ -39,7 +39,7 @@ void RW_Monitor::releaseWrite()
     // Signal all reader threads
     //read_lock.unlock();
     ok_read.notify_all();
-    
+
     // Signal any writer thread
     //write_lock.unlock();
     ok_write.notify_one();
