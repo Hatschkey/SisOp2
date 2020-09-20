@@ -15,5 +15,6 @@
 #define PAK_DAT 1 // Message packet
 #define PAK_CMD 2 // Command packet
 #define PAK_KAL 3 // Keep-Alive packet
+#define PAK_TRADE 4
 
 #endif

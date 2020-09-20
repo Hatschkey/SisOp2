@@ -98,7 +98,7 @@ int User::getSessionCount()
     return total_sessions;
 }
 
-int User::joinGroup(Group* group)
+int User::joinGroup(Group* group, int socket_id)
 {
     // Check for user session count
     if (this->getSessionCount() < MAX_SESSIONS)
@@ -124,6 +124,15 @@ int User::joinGroup(Group* group)
         // Release write rights
         joined_groups_monitor.releaseWrite();
 
+        // Request write rights
+        group_sockets_monitor.requestWrite();
+
+        // Add socket descriptor to corresponding thread id list
+        group_sockets.insert(std::make_pair(socket_id,group->groupname));
+
+        // Release write rights
+        group_sockets_monitor.releaseWrite();
+
         // Return sucessful join
         return 1;
     }
@@ -132,7 +141,7 @@ int User::joinGroup(Group* group)
     return 0;
 }
 
-void User::leaveGroup(Group* group)
+void User::leaveGroup(Group* group, int socket_id)
 {
     // Request write rights
     joined_groups_monitor.requestWrite();
@@ -162,6 +171,15 @@ void User::leaveGroup(Group* group)
             active_users_monitor.releaseWrite();
             joined_groups_monitor.releaseWrite();
 
+            // Request write rights
+            group_sockets_monitor.requestWrite();
+
+            // Remove session thread from vector
+            group_sockets.erase(socket_id);
+
+            // Release write rights
+            group_sockets_monitor.releaseWrite();
+
             // And delete itself
             free(this);
         }
@@ -188,4 +206,32 @@ int User::say(std::string message, std::string groupname)
         return group->post(message, this->username);
 
     return 0;
+}
+
+int User::signalNewMessage(std::string message, std::string username, std::string groupname)
+{
+    int message_record_size = 0;
+
+    // Create structure with message and metadata
+    message_record* msg = (message_record*)malloc(sizeof(message_record) + sizeof(char) * (message.length() + 1));
+    sprintf(msg->username, "%s", username.c_str());
+    msg->timestamp = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    msg->length = message.length() + 1;
+    sprintf((char*)msg->_message, "%s", message.c_str());
+
+    // Calculate struct size
+    message_record_size = sizeof(message_record) + msg->length;
+
+    // Iterate through connected client sockets
+    for (std::map<int, std::string>::iterator i = group_sockets.begin(); i != group_sockets.end(); ++i)
+    {
+        // If client is part of this group, send message
+        if (groupname.compare(i->second) == 0)
+            BaseSocket::sendPacket(i->first, PAK_DAT, (char*)msg, message_record_size);
+    }
+
+    // Free created structure
+    free(msg);
+
+    return 1;
 }
