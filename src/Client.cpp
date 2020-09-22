@@ -68,7 +68,7 @@ void Client::setupConnection()
     payload_size = sizeof(lp);
 
     // Sends the command packet to the server
-    BaseSocket::sendPacket(server_socket, PAK_CMD, (char*)&lp, payload_size); 
+    BaseSocket::sendPacket(server_socket, PAK_COMMAND, (char*)&lp, payload_size); 
 
     // Start user input getter thread
     pthread_create(&input_handler_thread, NULL, handleUserInput, NULL);
@@ -103,7 +103,7 @@ void Client::getMessages()
         // Try to read the rest of the payload from the socket stream
         switch(received_packet->type)
         {
-            case PAK_DAT: // Data packet (messages)
+            case PAK_DATA: // Data packet (messages)
 
                 // Decode payload into a message record
                 received_message = (message_record*)received_packet->_payload;
@@ -125,7 +125,16 @@ void Client::getMessages()
                 ClientInterface::printMessage(chat_message);
                 break;
 
-            case PAK_CMD: // Command packet (disconnect)
+            case PAK_SERVER_MESSAGE: // Server broadcast message for clients login/logout 
+                
+                // Decode payload into a message record
+                received_message = (message_record*)received_packet->_payload;
+
+                ClientInterface::printMessage(received_message->_message);
+
+                break;
+
+            case PAK_COMMAND: // Command packet (disconnect)
 
                 ClientInterface::printMessage(received_packet->_payload);
 
@@ -180,7 +189,7 @@ void *Client::handleUserInput(void* arg)
                 // Prepare message payload
                 char* payload = user_message + '\0';
                 payload_size = strlen(payload) + 1;
-                BaseSocket::sendPacket(server_socket, PAK_DAT, payload, payload_size);
+                BaseSocket::sendPacket(server_socket, PAK_DATA, payload, payload_size);
             }
 
         }

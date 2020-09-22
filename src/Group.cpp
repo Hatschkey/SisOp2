@@ -212,7 +212,7 @@ int Group::post(std::string message, std::string username)
     for (std::map<std::string, User*>::iterator i = users.begin(); i != users.end(); ++i)
     {
         // Signal each user instance in the group that a new message was posted
-        sent_messages += i->second->signalNewMessage(message, username, this->groupname);
+        sent_messages += i->second->signalNewMessage(message, username, this->groupname, PAK_DATA);
     }
 
     // Release read rights
@@ -331,4 +331,25 @@ int Group::recoverHistory(char* message_record_list, int n, User* user)
 
     // Return read messages
     return read_messages;
+}
+
+int Group::broadcastMessage(std::string message, std::string username)
+{
+    message_record* server_broadcast = (message_record*)malloc(sizeof(message_record) + sizeof(char) * message.length() + 1);
+    sprintf(server_broadcast->username, "%s", message.c_str());
+    server_broadcast->length = message.length() + 1;
+    server_broadcast->timestamp = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()); 
+    sprintf((char*)server_broadcast->_message, "%s", message.c_str());
+
+    this->users_monitor.requestRead();
+
+    // Send login/logout message to every connected users
+    for (std::map<std::string, User*>::iterator i = users.begin(); i != users.end(); ++i)
+    {
+        i->second->signalNewMessage(message, username, this->groupname, PAK_SERVER_MESSAGE);
+    }
+
+    this->users_monitor.releaseRead();
+
+    return 0;
 }

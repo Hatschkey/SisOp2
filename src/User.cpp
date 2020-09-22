@@ -208,7 +208,7 @@ int User::say(std::string message, std::string groupname)
     return 0;
 }
 
-int User::signalNewMessage(std::string message, std::string username, std::string groupname)
+int User::signalNewMessage(std::string message, std::string username, std::string groupname, int packet_type)
 {
     int message_record_size = 0;
 
@@ -227,7 +227,7 @@ int User::signalNewMessage(std::string message, std::string username, std::strin
     {
         // If client is part of this group, send message
         if (groupname.compare(i->second) == 0)
-            BaseSocket::sendPacket(i->first, PAK_DAT, (char*)msg, message_record_size);
+            BaseSocket::sendPacket(i->first, packet_type, (char*)msg, message_record_size);
     }
 
     // Free created structure

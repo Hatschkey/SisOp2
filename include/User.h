@@ -98,9 +98,10 @@ class User : protected BaseSocket
      * @param message Text message that will be sent to the clients
      * @param username Username of the user who posted this message
      * @param groupname Groupname of the group where the message was posted
+     * @param packet_type Packet type
      * @returns 
      */
-    int signalNewMessage(std::string message, std::string username, std::string groupname);
+    int signalNewMessage(std::string message, std::string username, std::string groupname, int packet_type);
 };
 
 #endif
