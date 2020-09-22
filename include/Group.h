@@ -115,6 +115,15 @@ class Group
      */
     int recoverHistory(char* message_record_list, int n, User* user);
 
+    /**
+     * Brodcast a chat message to connected clients as the server
+     * Saves the message and notifies all group members, including sender
+     * @param message  Message that is being broadcasted to the clients   
+     * @param username Username name for the client logging in or out
+     * @return Number indicanting success or failure(0 or 1)
+     */
+    int broadcastMessage(std::string message, std::string username);
+
 };
 
 #endif

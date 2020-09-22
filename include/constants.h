@@ -12,9 +12,9 @@
 #define MESSAGE_MAX  256     // Maximum size (in bytes) for a user message
 
 // Packet types
-#define PAK_DAT 1 // Message packet
-#define PAK_CMD 2 // Command packet
-#define PAK_KAL 3 // Keep-Alive packet
-#define PAK_TRADE 4
+#define PAK_DATA 1          // Message packet
+#define PAK_COMMAND 2       // Command packet
+#define PAK_KEEP_ALIVE 3    // Keep-Alive packet
+#define PAK_SERVER_MESSAGE 4  // A exclusive package sent by server
 
 #endif

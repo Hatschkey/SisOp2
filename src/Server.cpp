@@ -158,21 +158,15 @@ void *Server::handleConnection(void* arg)
         // Decide action according to packet type
         switch (received_packet->type)
         {
-            case PAK_DAT:   // Data packet
-                // Debug
-                //std::cout << "[" << user->username << " @ " << group->groupname << "] says: " << received_packet->_payload << std::endl;
-
+            case PAK_DATA:   // Data packet            
                 // Say the message to the group
                 if (user != NULL && group != NULL)
                     user->say(received_packet->_payload, group->groupname);
                 break;
 
-            case PAK_CMD:   // Command packet (login)
+            case PAK_COMMAND:   // Command packet (login)
                 // Get user login information
-                login_payload_buffer = (login_payload*)received_packet->_payload;
-
-                // TODO Debug messages
-                //std::cout << "Received login packet from " << login_payload_buffer->username << " @ " << login_payload_buffer-> groupname << std::endl;
+                login_payload_buffer = (login_payload*)received_packet->_payload;              
 
                 // Check if this group is already active, and create one if not
                 if ( (group = Group::getGroup(login_payload_buffer->groupname)) == NULL)
@@ -184,7 +178,7 @@ void *Server::handleConnection(void* arg)
 
                 // Try to join that group with this user
                 if (user->joinGroup(group, socket) != 0)
-                {
+                {                                     
                     // Recover message history for this user
                     read_messages = group->recoverHistory(message_records, Server::message_history, user);
 
@@ -194,14 +188,15 @@ void *Server::handleConnection(void* arg)
 
                         memcpy(server_message, message_records + offset, sizeof(message_record) + read_message->length);
 
-                        sendPacket(socket, PAK_DAT, server_message, sizeof(message_record) + ((message_record*)server_message)->length);
-
-                        //std::cout << ((message_record*)server_message)->username << std::endl;
-                        //std::cout << ((message_record*)server_message)->timestamp << std::endl;
-                        //std::cout << ((message_record*)server_message)->length << std::endl;
-                        //std::cout << ((message_record*)server_message)->_message << std::endl;
+                        sendPacket(socket, PAK_DATA, server_message, sizeof(message_record) + ((message_record*)server_message)->length);
 
                         offset += sizeof(message_record) + ((message_record*)server_message)->length;
+                    }
+
+                    if (user->getSessionCount() == 1) 
+                    {
+                        message = "User [" + user->username + "] has joined.";
+                        group->broadcastMessage(message ,user->username);
                     }
                 }
                 else
@@ -209,7 +204,7 @@ void *Server::handleConnection(void* arg)
                     // If user was not able to join group, refuse connection
                     // TODO Send message in some type of standard struct
                     sprintf(server_message, "%s %d", "Connection was refused due to exceding MAX_SESSIONS: ", MAX_SESSIONS);
-                    sendPacket(socket, PAK_CMD, server_message, sizeof(char)*strlen(server_message) + 1);
+                    sendPacket(socket, PAK_COMMAND, server_message, sizeof(char)*strlen(server_message) + 1);
 
                     // Reject connection
                     close(socket);
@@ -233,13 +228,12 @@ void *Server::handleConnection(void* arg)
             client_message[i] = '\0';
             server_message[i] = '\0';
         }
-    }
-
-    // Debug message
-    //std::cout << "[" << user->username << " @ " << group->groupname << "] disconnected" << std::endl;
+    }    
 
     // Leave group with this user
     user->leaveGroup(group, socket);
+
+    // TODO - Logout message right there
 
     // Free received argument
     free(arg);
