@@ -7,12 +7,16 @@
 
 class ClientInterface
 {
-    private:
-        static std::string groupname; // Name of the group user is connected to
+    public:
 
-        static int max_lines;         // Line limit
-        static int max_columns;       // Column limit
-        static int last_message_end;  // Line where the last message ended
+        static WINDOW* inptscr; // Bottom segment of the terminal where the user can type outgoing messages
+
+    private:
+
+        static WINDOW* infoscr; // Top segment of the terminal, presents info about the current session
+        static WINDOW* chatscr; // Middle segment of the terminal where incoming chat messages are shown
+
+        static std::string groupname; // Name of the group user is connected to
 
     public:
         /**
@@ -40,6 +44,11 @@ class ClientInterface
          * Deletes the old message and resets the cursor position
          */
         static void resetInput();
+
+        /**
+         * Resize interface acording to terminal size 
+         */
+        static void resize();
 };
 
 #endif

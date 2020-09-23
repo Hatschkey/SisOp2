@@ -2,25 +2,29 @@
 
 std::string ClientInterface::groupname;
 
-int ClientInterface::max_lines;
-int ClientInterface::max_columns;
-int ClientInterface::last_message_end;
+WINDOW* ClientInterface::infoscr;
+WINDOW* ClientInterface::chatscr;
+WINDOW* ClientInterface::inptscr;
 
 void ClientInterface::init(std::string group)
 {
     // Initialize group name
     ClientInterface::groupname = group;
 
-    // Initialize standard screen
-    initscr();
+    initscr();  
 
-    // Clear screen to start with a blank canvas
-    clear();
+    // Initialize top, middle and bottom segment
+    infoscr = newwin(        2, COLS - 1,         0, 0);
+    chatscr = newwin(LINES - 5, COLS - 1,         2, 0); // Leave 2 lines for top and bottom segments
+    inptscr = newwin(        2, COLS - 1, LINES - 2, 0);
 
-    // Initialize max lines and columns, as well as last message end
-    max_lines        = LINES - 1;
-    max_columns      = COLS - 1;
-    last_message_end = 2;
+    // Clear these screens to start with a blank canvas
+    wclear(infoscr);
+    wclear(chatscr);
+    wclear(inptscr);
+
+    // Enable scroll on chat screen
+    scrollok(chatscr, true);
 
     // Print the UI components
     ClientInterface::printUI();
@@ -28,42 +32,44 @@ void ClientInterface::init(std::string group)
 
 void ClientInterface::destroy()
 {
+    // Delete all windows
+    delwin(infoscr);
+    delwin(chatscr);
+    delwin(inptscr);
+
     refresh();
     endwin();
 }
 
 void ClientInterface::printMessage(std::string message)
 {
-    int message_line_count = 1 + (int)ceil((float)message.length()/max_columns); // Calculate amount of lines this message occupies
+    //int message_line_count = (int)ceil((float)message.length()/getmaxx(chatscr)); // Calculate amount of lines this message occupies
 
-    // Save old x and y cursor pos
-    int old_cursor_x;
-    int old_cursor_y;
-    getyx(stdscr,old_cursor_y,old_cursor_x);
+    // Get current x and y for cursor
+    //int cursor_y = getcury(chatscr);
 
-    // Check if last message was too close to the bottom of the screen
-    if (ClientInterface::last_message_end + message_line_count >= max_lines - 2)
+    // Print message to screen
+    wprintw(chatscr, (message + "\n").c_str());
+
+    //wmove(chatscr, cursor_y + message_line_count, 0);
+/*
+    // Check if printing the message would exceed max screen size
+    if (cursor_y + message_line_count >= getmaxy(chatscr) - 1)
     {
-        // If so, clear the screen to make space for it
-        // TODO Maybe try to do some sort of scroll afterwards?
+
     }
     else
     {
-        // If not, just print the message to the screen
-        mvaddstr(ClientInterface::last_message_end, 0, message.c_str());
+        // If not, just print the message
+        waddstr(chatscr, message.c_str());
+        
+        // Move the cursor to the next line
+        wmove(chatscr, cursor_y + message_line_count, 0);
     }
+*/
 
     // Refresh screen
-    refresh();
-
-    // Increase last message end
-    ClientInterface::last_message_end += message_line_count;
-
-    // Move the cursor back to the bottom
-    move(old_cursor_y,old_cursor_x);
-
-    // Refresh screen
-    refresh();
+    wrefresh(chatscr);
 }
 
 void ClientInterface::printUI()
@@ -72,25 +78,25 @@ void ClientInterface::printUI()
     std::string bottom_ui = "Say something: ";
 
     // Add UI at the top
-    mvaddstr(0,0,top_ui.c_str());
+    mvwaddstr(infoscr, 0, 0, top_ui.c_str());
 
     // Add UI at the bottom
-    mvaddstr(max_lines, 0, bottom_ui.c_str());
+    mvwaddstr(inptscr, 0, 0, bottom_ui.c_str());
 
-    // Refresh screen
-    refresh();
+    // Refresh screens
+    wrefresh(infoscr);
+    wrefresh(inptscr);
 }
 
 void ClientInterface::resetInput()
 {
-    // Move cursor to bottom
-    move(max_lines, 15);
 
     // Clear user message
-    clrtoeol();
+    wclear(inptscr);
 
-    // Move back to start
-    move(max_lines, 15);
+    // Reprint the UI
+    ClientInterface::printUI();
 
-    refresh();
+    // Refresh screen
+    wrefresh(inptscr);
 }
