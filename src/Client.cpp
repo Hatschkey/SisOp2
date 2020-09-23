@@ -31,7 +31,7 @@ Client::Client(std::string username, std::string groupname, std::string server_i
     stop_issued = false;
 
     // Initialize client interface
-    ClientInterface::init(groupname);
+    ClientInterface::init(groupname);   
 };
 
 Client::~Client()
@@ -194,20 +194,11 @@ void *Client::handleUserInput(void* arg)
 
             if (strlen(user_message) > 0) 
  	        {
+                // Prepare message payload
+                char* payload = user_message + '\0';
+                payload_size = strlen(payload) + 1;
+                BaseSocket::sendPacket(server_socket, PAK_DATA, payload, payload_size);
 
-                //  ClientInterface::printMessage(user_message);
-
-                if (user_message[0] == KEY_RESIZE)
-                {
-                    ClientInterface::resize();
-                }
-                else
-                {
-                    // Prepare message payload
-                    char* payload = user_message + '\0';
-                    payload_size = strlen(payload) + 1;
-                    BaseSocket::sendPacket(server_socket, PAK_DATA, payload, payload_size);
-                }
             }
 
         }

@@ -4,6 +4,7 @@
 #include <curses.h>
 #include <string>
 #include <cmath>
+#include <csignal>
 
 class ClientInterface
 {
@@ -46,9 +47,9 @@ class ClientInterface
         static void resetInput();
 
         /**
-         * Resize interface acording to terminal size 
+         * Handles a terminal resize signal 
          */
-        static void resize();
+        static void handleResize(int signum);
 };
 
 #endif

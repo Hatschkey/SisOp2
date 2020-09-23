@@ -28,6 +28,8 @@ void ClientInterface::init(std::string group)
 
     // Print the UI components
     ClientInterface::printUI();
+
+    std::signal(SIGWINCH, ClientInterface::handleResize);
 }
 
 void ClientInterface::destroy()
@@ -76,5 +78,18 @@ void ClientInterface::resetInput()
     ClientInterface::printUI();
 
     // Refresh screen
+    wrefresh(inptscr);
+}
+
+void ClientInterface::handleResize(int signum)
+{
+    // Resize windows according to new terminal size
+    wresize(infoscr, 2, COLS - 1);
+    wresize(chatscr, LINES - 5, COLS - 1);
+    wresize(inptscr,    2, COLS - 1);
+
+    // Refresh windows
+    wrefresh(infoscr);
+    wrefresh(chatscr);
     wrefresh(inptscr);
 }
