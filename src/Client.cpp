@@ -31,7 +31,7 @@ Client::Client(std::string username, std::string groupname, std::string server_i
     stop_issued = false;
 
     // Initialize client interface
-    ClientInterface::init(groupname);
+    ClientInterface::init(groupname);   
 };
 
 Client::~Client()
@@ -82,8 +82,9 @@ void Client::getMessages()
     message_record* received_message;   // Pointer to a message record, used to decode received packet payload
     packet* received_packet;
 
+    char message_time[9];     // Timestamp of the message
     std::string chat_message; // Final composed chat message string, printed to the interface
-    std::string username;   // Name of the user who sent the message
+    std::string username;     // Name of the user who sent the message
 
     // Clear buffer to receive new packets
     for (int i=0; i < PACKET_MAX; i++) server_message[i] = '\0';
@@ -120,8 +121,11 @@ void Client::getMessages()
                     sprintf(received_message->username,"%s",username.c_str());
                 }
 
+                // Get time into a readable format
+                strftime(message_time, sizeof(message_time), "%H:%M:%S", std::localtime((time_t*)&received_message->timestamp));
+
                 // Display message
-                chat_message = std::ctime((time_t*)&received_message->timestamp) + std::string(" ") + received_message->username + ": " + received_message->_message;
+                chat_message = message_time + std::string(" ") + received_message->username + ": " + received_message->_message;
                 ClientInterface::printMessage(chat_message);
                 break;
 
@@ -130,7 +134,12 @@ void Client::getMessages()
                 // Decode payload into a message record
                 received_message = (message_record*)received_packet->_payload;
 
-                ClientInterface::printMessage(received_message->_message);
+                // Get time into a readable format
+                strftime(message_time, sizeof(message_time), "%H:%M:%S", std::localtime((time_t*)&received_message->timestamp));
+
+                // Display message
+                chat_message = message_time + std::string(" ") + std::string(received_message->_message);
+                ClientInterface::printMessage(chat_message);
 
                 break;
 
@@ -177,7 +186,7 @@ void *Client::handleUserInput(void* arg)
     {
         // Get user message
         // TODO Detect Ctrl D press instead of Ctrl C
-        getstr(user_message);
+        wgetstr(ClientInterface::inptscr, user_message);
         try
         {
             // Reset input area below the screen
@@ -185,11 +194,11 @@ void *Client::handleUserInput(void* arg)
 
             if (strlen(user_message) > 0) 
  	        {
-
                 // Prepare message payload
                 char* payload = user_message + '\0';
                 payload_size = strlen(payload) + 1;
                 BaseSocket::sendPacket(server_socket, PAK_DATA, payload, payload_size);
+
             }
 
         }
