@@ -228,12 +228,17 @@ void *Server::handleConnection(void* arg)
             client_message[i] = '\0';
             server_message[i] = '\0';
         }
-    }    
+    }   
+    
+    // Shows a disconnect message when the last user client logouts
+    if (user->getSessionCount() == 1) 
+    {
+        message = "User [" + user->username + "] has disconnected.";
+        group->broadcastMessage(message ,user->username);
+    }
 
     // Leave group with this user
     user->leaveGroup(group, socket);
-
-    // TODO - Logout message right there
 
     // Free received argument
     free(arg);
