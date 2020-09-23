@@ -178,7 +178,7 @@ void *Server::handleConnection(void* arg)
 
                 // Try to join that group with this user
                 if (user->joinGroup(group, socket) != 0)
-                {                                     
+                {
                     // Recover message history for this user
                     read_messages = group->recoverHistory(message_records, Server::message_history, user);
 

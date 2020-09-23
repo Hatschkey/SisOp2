@@ -341,6 +341,9 @@ int Group::broadcastMessage(std::string message, std::string username)
     server_broadcast->timestamp = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()); 
     sprintf((char*)server_broadcast->_message, "%s", message.c_str());
 
+    // Save message
+    this->saveMessage(message, username);
+
     this->users_monitor.requestRead();
 
     // Send login/logout message to every connected users
