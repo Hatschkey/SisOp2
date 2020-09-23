@@ -43,30 +43,8 @@ void ClientInterface::destroy()
 
 void ClientInterface::printMessage(std::string message)
 {
-    //int message_line_count = (int)ceil((float)message.length()/getmaxx(chatscr)); // Calculate amount of lines this message occupies
-
-    // Get current x and y for cursor
-    //int cursor_y = getcury(chatscr);
-
     // Print message to screen
     wprintw(chatscr, (message + "\n").c_str());
-
-    //wmove(chatscr, cursor_y + message_line_count, 0);
-/*
-    // Check if printing the message would exceed max screen size
-    if (cursor_y + message_line_count >= getmaxy(chatscr) - 1)
-    {
-
-    }
-    else
-    {
-        // If not, just print the message
-        waddstr(chatscr, message.c_str());
-        
-        // Move the cursor to the next line
-        wmove(chatscr, cursor_y + message_line_count, 0);
-    }
-*/
 
     // Refresh screen
     wrefresh(chatscr);
