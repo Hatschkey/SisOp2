@@ -203,7 +203,7 @@ int Group::post(std::string message, std::string username)
     int sent_messages = 0; // Number of messages that were sent
 
     // Save this message
-    this->saveMessage(message, username);
+    this->saveMessage(message, username, USER_MESSAGE);
 
     // Request read rights
     users_monitor.requestRead();
@@ -212,7 +212,7 @@ int Group::post(std::string message, std::string username)
     for (std::map<std::string, User*>::iterator i = users.begin(); i != users.end(); ++i)
     {
         // Signal each user instance in the group that a new message was posted
-        sent_messages += i->second->signalNewMessage(message, username, this->groupname, PAK_DATA);
+        sent_messages += i->second->signalNewMessage(message, username, this->groupname, PAK_DATA, USER_MESSAGE);
     }
 
     // Release read rights
@@ -222,13 +222,14 @@ int Group::post(std::string message, std::string username)
     return sent_messages;
 }
 
-void Group::saveMessage(std::string message, std::string username)
+void Group::saveMessage(std::string message, std::string username, int message_type)
 {
     // Create a record for the user message
     message_record* msg = (message_record*)malloc(sizeof(*msg) + sizeof(char)*(strlen(message.c_str()) + 1));
     sprintf(msg->username,"%s", username.c_str());  // Copy username
     msg->timestamp = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()); // Current timestamp
     msg->length = strlen(message.c_str()) + 1; // Update message length
+    msg->type = message_type;
     sprintf((char*)msg->_message,"%s",message.c_str()); // Copy message
 
     // Calculate struct size
@@ -293,6 +294,7 @@ int Group::recoverHistory(char* message_record_list, int n, User* user)
             message = (message_record*)malloc(sizeof(message_record) + sizeof(char)*(strlen(message_buffer) + 1));
             sprintf(message->username, "%s", ((message_record*)header_buffer)->username);
             message->length = ((message_record*)header_buffer)->length;
+            message->type = ((message_record*)header_buffer)->type;
             message->timestamp = ((message_record*)header_buffer)->timestamp;
             sprintf((char*)message->_message, "%s", message_buffer);
 
@@ -335,21 +337,23 @@ int Group::recoverHistory(char* message_record_list, int n, User* user)
 
 int Group::broadcastMessage(std::string message, std::string username)
 {
+    // Is this necessary to instantiate a new message_record ? 
     message_record* server_broadcast = (message_record*)malloc(sizeof(message_record) + sizeof(char) * message.length() + 1);
     sprintf(server_broadcast->username, "%s", message.c_str());
     server_broadcast->length = message.length() + 1;
+    server_broadcast->type = SERVER_MESSAGE;
     server_broadcast->timestamp = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()); 
     sprintf((char*)server_broadcast->_message, "%s", message.c_str());
 
     // Save message
-    this->saveMessage(message, username);
+    this->saveMessage(message, username, SERVER_MESSAGE);
 
     this->users_monitor.requestRead();
 
     // Send login/logout message to every connected users
     for (std::map<std::string, User*>::iterator i = users.begin(); i != users.end(); ++i)
     {
-        i->second->signalNewMessage(message, username, this->groupname, PAK_SERVER_MESSAGE);
+        i->second->signalNewMessage(message, username, this->groupname, PAK_SERVER_MESSAGE, SERVER_MESSAGE);
     }
 
     this->users_monitor.releaseRead();

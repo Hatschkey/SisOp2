@@ -273,7 +273,7 @@ void Server::setupConnection()
         throw std::runtime_error(appendErrorMessage("Error setting socket options"));
 
     // Bind socket
-    if ( bind(server_socket, (struct sockaddr *)&server_address, sizeof(server_address)) < 0)
+    if (bind(server_socket, (struct sockaddr *)&server_address, sizeof(server_address)) < 0)
         throw std::runtime_error(appendErrorMessage("Error during socket bind"));
 }
 

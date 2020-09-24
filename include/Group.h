@@ -103,8 +103,9 @@ class Group
      * TODO This method should be mutex protected (No other threads should read or write to the file concurrently)
      * @param message  Message that will be saved
      * @param username User who sent this message
+     * @param message_type Indicates wether a message was sent by the server or a user
      */
-    void saveMessage(std::string message, std::string username);
+    void saveMessage(std::string message, std::string username, int message_type);
 
     /**
      * Recovers the last N messages from the group's history file, sending them to the user

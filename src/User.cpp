@@ -208,7 +208,7 @@ int User::say(std::string message, std::string groupname)
     return 0;
 }
 
-int User::signalNewMessage(std::string message, std::string username, std::string groupname, int packet_type)
+int User::signalNewMessage(std::string message, std::string username, std::string groupname, int packet_type, int message_type)
 {
     int message_record_size = 0;
 
@@ -216,6 +216,7 @@ int User::signalNewMessage(std::string message, std::string username, std::strin
     message_record* msg = (message_record*)malloc(sizeof(message_record) + sizeof(char) * (message.length() + 1));
     sprintf(msg->username, "%s", username.c_str());
     msg->timestamp = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    msg->type = message_type;
     msg->length = message.length() + 1;
     sprintf((char*)msg->_message, "%s", message.c_str());
 
