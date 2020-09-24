@@ -1,17 +1,25 @@
 #ifndef RW_MONITOR_H
 #define RW_MONITOR_H
 
-#include <condition_variable>
-#include <mutex>
 #include <iostream>
+#include <atomic>
+#include <pthread.h>
 
 class RW_Monitor
 {
     public:
-    int num_readers, num_writers;                               // Current number of readers and writers
-    std::condition_variable ok_read, ok_write;                  // Condition variables for readers and writers
+    std::atomic<int> num_readers, num_writers;  // Current number of readers and writers
+    pthread_cond_t ok_read, ok_write;           // Condition variables for reading and writing
+    pthread_mutex_t lock;                       // Mutex lock for the incoming requests to wait
 
-    std::unique_lock<std::mutex> lock;
+    //std::unique_lock<std::mutex> lock;
+
+
+    /**
+     * Class constructor
+     * Initializes num_readers and num_writers with 0 
+     */
+    RW_Monitor();
 
     /**
      * Requests to perform a read operation on the data
