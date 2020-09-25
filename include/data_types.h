@@ -29,6 +29,7 @@ typedef struct __message_record
 {
     char username[23];      // User who sent this message (20 for name, 1 for \0 and 2 for brackets)
     uint16_t length;        // Message length
+    uint16_t type;          // Message's record type. Can be a SERVER_MESSAGE or USER_MESSAGE
     uint64_t timestamp;     // Message timestamp for ordering purposes
     const char _message[];  // What the user said
 

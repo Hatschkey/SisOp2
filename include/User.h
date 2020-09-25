@@ -99,9 +99,10 @@ class User : protected BaseSocket
      * @param username Username of the user who posted this message
      * @param groupname Groupname of the group where the message was posted
      * @param packet_type Packet type
+     * @param message_type Indicates wether the message type is USER_MESSAGE or SERVER_MESSAGE
      * @returns 
      */
-    int signalNewMessage(std::string message, std::string username, std::string groupname, int packet_type);
+    int signalNewMessage(std::string message, std::string username, std::string groupname, int packet_type, int message_type);
 };
 
 #endif
