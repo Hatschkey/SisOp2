@@ -116,9 +116,9 @@ void Server::listCommands()
 
 void *Server::handleCommands(void* arg)
 {
-    // Get administrator commands until Ctrl D is pressed
+    // Get administrator commands until Ctrl D is pressed or 'stop' is typed
     std::string command;
-    while(std::getline(std::cin, command))
+    while(!stop_issued && std::getline(std::cin, command))
     {
         try
         {
@@ -299,13 +299,21 @@ void Server::setupConnection()
 
 void Server::listThreads()
 {
+    // Request read rights
     threads_monitor.requestRead();
 
+    // Delimiter
+    std::cout << "======================" << std::endl;
+    
+    // Iterate through threads
     for (std::map<int, pthread_t>::iterator i = connection_handler_threads.begin(); i != connection_handler_threads.end(); ++i)
     {
-        std::cout << "Thread associated with socket " << i->first <<std::endl;
+        std::cout << " Thread associated with socket " << i->first <<std::endl;
     }
+    // Delimiter
+    std::cout << "======================" << std::endl;
 
+    // Release read rights
     threads_monitor.releaseRead();
 }
 

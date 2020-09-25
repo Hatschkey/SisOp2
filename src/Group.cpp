@@ -97,15 +97,22 @@ void Group::listGroups()
     // Request read rights
     Group::active_groups_monitor.requestRead();
 
+    // Delimiter
+    std::cout << "======================\n" << std::endl;
+    
     // Iterate map listing groups and their users
     for (std::map<std::string,Group*>::iterator i = active_groups.begin(); i != active_groups.end(); ++i)
     {
-        std::cout << std::endl;
         std::cout << "Groupname: " << i->second->groupname << std::endl;
         std::cout << "User count: " << i->second->getUserCount() << std::endl;
+        std::cout << "Users: " << std::endl;
         // List all users in the group
         i->second->listUsers();
+        std::cout << std::endl;
     }
+
+    // Delimiter
+    std::cout << "======================" << std::endl;
 
     // Release read rights
     Group::active_groups_monitor.releaseRead();
@@ -187,7 +194,7 @@ void Group::listUsers()
 
     // Iterate vector listing all users
     for (std::map<std::string, User*>::iterator i = users.begin(); i != users.end(); ++i)
-        std::cout << "User: " << i->second->username << std::endl;
+        std::cout << " - User: " << i->second->username << std::endl;
 
     // Release read rights
     this->users_monitor.releaseRead();

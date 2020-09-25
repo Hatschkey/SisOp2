@@ -47,14 +47,19 @@ void User::listUsers()
     // Request read rights
     active_users_monitor.requestRead();
 
+    // Delimiter
+    std::cout << "======================\n" << std::endl;
+
     // Iterate map listing users
     for (std::map<std::string,User*>::iterator i = active_users.begin(); i != active_users.end(); ++i)
     {
-        std::cout << std::endl;
         std::cout << "Username: " << i->second->username << std::endl;
         std::cout << "Active sessions: " << i->second->getSessionCount() << std::endl;
         std::cout << "Last seen: " << std::ctime((time_t*)&(i->second->last_seen)) << std::endl;
     }
+
+    // Delimiter
+    std::cout << "======================" << std::endl;
 
     // Release read rights
     active_users_monitor.releaseRead();
