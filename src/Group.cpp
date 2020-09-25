@@ -226,7 +226,7 @@ void Group::saveMessage(std::string message, std::string username)
     long message_count = -1; // Number of messages already present in the file
 
     // Compose the message
-    message_record* msg = BaseSocket::composeMessage(username, message,  0);
+    message_record* msg = CommunicationUtils::composeMessage(username, message,  0);
 
     // Calculate message size
     record_size = sizeof(*msg) + msg->length;

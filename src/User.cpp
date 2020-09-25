@@ -217,7 +217,7 @@ int User::signalNewMessage(std::string message, std::string username, std::strin
     int message_record_size = 0; // Size of the composed message (in bytes)
 
     // Compose a new message
-    message_record* msg = BaseSocket::composeMessage(username, message, 0 /* HERE!*/ );
+    message_record* msg = CommunicationUtils::composeMessage(username, message, 0 /* HERE!*/ );
 
     // Calculate message size
     message_record_size = sizeof(*msg) + msg->length;
@@ -230,7 +230,7 @@ int User::signalNewMessage(std::string message, std::string username, std::strin
     {
         // If client is part of this group, send message
         if (groupname.compare(i->second) == 0)
-            BaseSocket::sendPacket(i->first, packet_type, (char*)msg, message_record_size);
+            CommunicationUtils::sendPacket(i->first, packet_type, (char*)msg, message_record_size);
     }
 
     // Release read rights

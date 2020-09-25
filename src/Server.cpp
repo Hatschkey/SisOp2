@@ -53,7 +53,6 @@ void Server::listenConnections()
     Server::listCommands();
 
     // Wait for incoming connections
-    // TODO Change from 'accept' to a non blocking method, so thread may be stopped safely
     int sockaddr_size = sizeof(struct sockaddr_in);
     int* new_socket;
     while(!stop_issued && (client_socket = accept(server_socket, (struct sockaddr*)&client_address, (socklen_t*)&sockaddr_size)) > 0 )
@@ -91,10 +90,15 @@ void Server::listenConnections()
     // Wait for all threads to finish
     for (std::map<int, pthread_t>::iterator i = connection_handler_threads.begin(); i != connection_handler_threads.end(); ++i)
     {
-        std::cout << "Waiting for client communication to end..." << std::endl;
+        std::cout << "Waiting for client communication to end on socket " << i->first << "..." << std::endl;
         pthread_t* ref = &(i->second);
         pthread_join(*ref, NULL);
     }
+
+    std::cout << "Waiting for command handler to end..." << std::endl;
+
+    // Join with the command handler thread
+    pthread_join(command_handler_thread, NULL);
 
     // Release read rights
     threads_monitor.releaseRead();
@@ -242,9 +246,8 @@ void *Server::handleConnection(void* arg)
     }   
     
     // Leave group with this user
-    std::cout << "Going to leave the group " << groupname << " with user " << username << " on thread " << socket << std::endl;
-    user->leaveGroup(group, socket); // TODO This is being executed twice for some reason?
-
+    user->leaveGroup(group, socket);
+    
     // Request read rights
     User::active_users_monitor.requestRead();
     Group::active_groups_monitor.requestRead();

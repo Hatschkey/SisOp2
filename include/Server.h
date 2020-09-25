@@ -16,9 +16,9 @@
 #include "data_types.h"
 #include "constants.h"
 #include "RW_Monitor.h"
-#include "BaseSocket.h"
+#include "CommunicationUtils.h"
 
-class Server : protected BaseSocket
+class Server : protected CommunicationUtils
 {
     // Private attributes
     private:

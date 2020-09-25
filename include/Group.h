@@ -4,18 +4,19 @@
 #include <map>
 #include <string.h>
 #include <unistd.h>
+#include <list>
 
 #include "constants.h"
 #include "data_types.h"
 #include "User.h"
 #include "RW_Monitor.h"
-#include "BaseSocket.h"
-#include <list>
+#include "CommunicationUtils.h"
+
 
 // Forward declare User
 class User;
 
-class Group : protected BaseSocket
+class Group : protected CommunicationUtils
 {
     public:
     static std::map<std::string, Group*> active_groups;  // Current active groups

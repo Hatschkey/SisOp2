@@ -10,12 +10,12 @@
 #include "data_types.h"
 #include "Group.h"
 #include "RW_Monitor.h"
-#include "BaseSocket.h"
+#include "CommunicationUtils.h"
 
 // Forward declare Group
 class Group;
 
-class User : protected BaseSocket
+class User : protected CommunicationUtils
 {
     public:
     static std::map<std::string, User*> active_users;   // Current active users

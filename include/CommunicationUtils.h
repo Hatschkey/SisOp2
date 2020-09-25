@@ -1,5 +1,5 @@
-#ifndef BASESOCKET_H
-#define BASESOCKET_H
+#ifndef COMMUNICATIONUTILS_H
+#define COMMUNICATIONUTILS_H
 
 #include <sys/socket.h>
 #include <string>
@@ -10,7 +10,7 @@
 #include "data_types.h"
 #include "constants.h"
 
-class BaseSocket {
+class CommunicationUtils {
     
     protected:
     // Protected methods
@@ -34,6 +34,16 @@ class BaseSocket {
      * @returns Pointer to the created message record
      */
     static message_record* composeMessage(std::string sender_name, std::string message_content, int message_type);
+
+
+    /**
+     * Tries to fully receive a packet from the informed socket, putting it in buffer
+     * @param   socket From whence to receive the packet
+     * @param   buffer Buffer where received data should be put
+     * @param   buf_size Max size of the passed buffer
+     * @returns Number of bytes received and put into buffer
+     */
+    static int receivePacket(int socket, char* buffer, int buf_size);
 };
 
 #endif

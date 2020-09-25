@@ -68,7 +68,7 @@ void Client::setupConnection()
     payload_size = sizeof(lp);
 
     // Sends the command packet to the server
-    BaseSocket::sendPacket(server_socket, PAK_COMMAND, (char*)&lp, payload_size); 
+    CommunicationUtils::sendPacket(server_socket, PAK_COMMAND, (char*)&lp, payload_size); 
 
     // Start user input getter thread
     pthread_create(&input_handler_thread, NULL, handleUserInput, NULL);
@@ -77,7 +77,6 @@ void Client::setupConnection()
 void Client::getMessages()
 {
     int read_bytes = -1;                // Number of bytes read from the header
-    int payload_bytes = 0;              // Number of bytes read from the payload
     char server_message[PACKET_MAX];    // Buffer for message sent from server
     message_record* received_message;   // Pointer to a message record, used to decode received packet payload
     packet* received_packet;
@@ -87,19 +86,13 @@ void Client::getMessages()
     std::string username;     // Name of the user who sent the message
 
     // Clear buffer to receive new packets
-    for (int i=0; i < PACKET_MAX; i++) server_message[i] = '\0';
+    bzero(server_message, PACKET_MAX);
 
     // Wait for messages from the server
-    while(!stop_issued && (read_bytes = recv(server_socket, server_message, sizeof(packet), 0)) > 0)
+    while(!stop_issued && (read_bytes = CommunicationUtils::receivePacket(server_socket, server_message, PACKET_MAX)) > 0)
     {
         // Decode message into packet format
         received_packet = (packet*)server_message;
-
-        // Wait for the entire message to arrive
-        while (payload_bytes < received_packet->length)
-        {
-            payload_bytes += recv(server_socket, server_message + read_bytes, received_packet->length - payload_bytes, 0);
-        }
 
         // Try to read the rest of the payload from the socket stream
         switch(received_packet->type)
@@ -158,16 +151,17 @@ void Client::getMessages()
         }
 
         // Clear buffer to receive new packets
-        for (int i=0; i < PACKET_MAX; i++) server_message[i] = '\0';
+        bzero(server_message, PACKET_MAX);
 
-        // Reset number of bytes read from payload
-        payload_bytes = 0;
     }
     // If server closes connection
     if (read_bytes == 0)
     {
         std::cout << "\nConnection closed." << std::endl;
     }
+
+    // Signal input handler to stop
+    stop_issued = true;
 
     // Wait for thread to finish
     pthread_join(Client::input_handler_thread,NULL);
@@ -197,7 +191,7 @@ void *Client::handleUserInput(void* arg)
                 // Prepare message payload
                 char* payload = user_message + '\0';
                 payload_size = strlen(payload) + 1;
-                BaseSocket::sendPacket(server_socket, PAK_DATA, payload, payload_size);
+                CommunicationUtils::sendPacket(server_socket, PAK_DATA, payload, payload_size);
 
             }
 

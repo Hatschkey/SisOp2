@@ -1,11 +1,11 @@
-#include "BaseSocket.h"
+#include "CommunicationUtils.h"
 
-std::string BaseSocket::appendErrorMessage(const std::string message)
+std::string CommunicationUtils::appendErrorMessage(const std::string message)
 {
     return message + " (" + std::string(strerror(errno)) + ")";
 }
 
-int BaseSocket::sendPacket(int socket, int packet_type, char* payload, int payload_size)
+int CommunicationUtils::sendPacket(int socket, int packet_type, char* payload, int payload_size)
 {
     // Calculate size of packet that will be sent
     int packet_size = sizeof(packet) + payload_size;
@@ -33,7 +33,7 @@ int BaseSocket::sendPacket(int socket, int packet_type, char* payload, int paylo
     return bytes_sent;
 }
 
-message_record* BaseSocket::composeMessage(std::string sender_name, std::string message_content, int message_type)
+message_record* CommunicationUtils::composeMessage(std::string sender_name, std::string message_content, int message_type)
 {
     // Calculate total size of the message record struct
     int record_size = sizeof(message_record) + (message_content.length() + 1);
@@ -50,4 +50,50 @@ message_record* BaseSocket::composeMessage(std::string sender_name, std::string 
 
     //Return a pointer to it
     return msg;
+}
+
+int CommunicationUtils::receivePacket(int socket, char* buffer, int buf_size)
+{
+    int total_bytes   = 0; // Total number of bytes read
+    int read_bytes    = 0; // Number of bytes in current read
+    int payload_bytes = 0; // Bytes read from the payload
+    int header_size  = sizeof(packet); // Size of the packet header
+
+    // While the header hasn't arrived entirely and the socket was not closed
+    while (read_bytes >= 0 && total_bytes < header_size && 
+          (read_bytes = recv(socket, buffer + total_bytes, header_size - total_bytes, 0)) > 0)
+    {
+        // If data has arrived, increase total
+        if (read_bytes > 0) total_bytes += read_bytes;
+        // If socket was closed, reset total
+        else total_bytes = -1;
+    }
+    // If the entire header arrived
+    if (total_bytes == header_size)
+    {
+        // Reset number of read bytes
+        read_bytes = 0;
+
+        // While the entire payload hasn't arrived
+        while (read_bytes >= 0 && payload_bytes < ((packet*)buffer)->length &&
+        (read_bytes = recv(socket, buffer + total_bytes, ((packet*)buffer)->length - payload_bytes, 0)) > 0)
+        {
+            // If data has arrived, increase totals
+            if (read_bytes > 0)
+            {
+                payload_bytes += read_bytes;
+                total_bytes   += read_bytes;
+            }
+            // If the socket was closed, reset total
+            else
+            {
+                read_bytes = -1;
+            }
+            
+        }
+
+    }
+
+    // Return amount of bytes read/written
+    return total_bytes;
 }

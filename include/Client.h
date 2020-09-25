@@ -15,11 +15,11 @@
 
 #include "constants.h"
 #include "data_types.h"
-#include "BaseSocket.h"
+#include "CommunicationUtils.h"
 
 #include "ClientInterface.h"
 
-class Client : protected BaseSocket
+class Client : protected CommunicationUtils
 {
     // Private attributes
     private:
