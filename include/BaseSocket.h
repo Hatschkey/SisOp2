@@ -25,6 +25,15 @@ class BaseSocket {
      * @returns Number of bytes sent
      */
     static int sendPacket(int socket, int packet_type, char* payload, int payload_size);
+
+    /**
+     * Creates a struct of type message_record with the provided data
+     * @param sender_name Username of the user who sent this message
+     * @param message_content Actual chat message
+     * @param message_type Type of message TODO
+     * @returns Pointer to the created message record
+     */
+    static message_record* composeMessage(std::string sender_name, std::string message_content, int message_type);
 };
 
 #endif

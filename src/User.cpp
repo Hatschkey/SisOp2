@@ -141,7 +141,7 @@ int User::joinGroup(Group* group, int socket_id)
     return 0;
 }
 
-void User::leaveGroup(Group* group, int socket_id)
+int User::leaveGroup(Group* group, int socket_id)
 {
     // Request write rights
     joined_groups_monitor.requestWrite();
@@ -181,19 +181,23 @@ void User::leaveGroup(Group* group, int socket_id)
             group_sockets_monitor.releaseWrite();
 
             // And delete itself
-            free(this);
+            delete(this);
+
         }
         else
         {
             // Release write rights
             joined_groups_monitor.releaseWrite();
         }
+
     }
     else
     {
         // Release write rights
         joined_groups_monitor.releaseWrite();
     }
+
+    return 0;
 }
 
 int User::say(std::string message, std::string groupname)
@@ -210,17 +214,16 @@ int User::say(std::string message, std::string groupname)
 
 int User::signalNewMessage(std::string message, std::string username, std::string groupname, int packet_type)
 {
-    int message_record_size = 0;
+    int message_record_size = 0; // Size of the composed message (in bytes)
 
-    // Create structure with message and metadata
-    message_record* msg = (message_record*)malloc(sizeof(message_record) + sizeof(char) * (message.length() + 1));
-    sprintf(msg->username, "%s", username.c_str());
-    msg->timestamp = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-    msg->length = message.length() + 1;
-    sprintf((char*)msg->_message, "%s", message.c_str());
+    // Compose a new message
+    message_record* msg = BaseSocket::composeMessage(username, message, 0 /* HERE!*/ );
 
-    // Calculate struct size
-    message_record_size = sizeof(message_record) + msg->length;
+    // Calculate message size
+    message_record_size = sizeof(*msg) + msg->length;
+
+    // Request read rights
+    group_sockets_monitor.requestRead();
 
     // Iterate through connected client sockets
     for (std::map<int, std::string>::iterator i = group_sockets.begin(); i != group_sockets.end(); ++i)
@@ -229,6 +232,9 @@ int User::signalNewMessage(std::string message, std::string username, std::strin
         if (groupname.compare(i->second) == 0)
             BaseSocket::sendPacket(i->first, packet_type, (char*)msg, message_record_size);
     }
+
+    // Release read rights
+    group_sockets_monitor.releaseRead();
 
     // Free created structure
     free(msg);

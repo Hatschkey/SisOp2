@@ -9,12 +9,13 @@
 #include "data_types.h"
 #include "User.h"
 #include "RW_Monitor.h"
+#include "BaseSocket.h"
 #include <list>
 
 // Forward declare User
 class User;
 
-class Group
+class Group : protected BaseSocket
 {
     public:
     static std::map<std::string, Group*> active_groups;  // Current active groups
@@ -74,7 +75,7 @@ class Group
     /**
      * Remove the user corresponding to the given username
      * @param username Name of the user that should be removed from this group
-     * @return Number of deleted users, should always be either 1 or 0
+     * @return 1 if this was the last user in group, 0 otherwise
      */
     int removeUser(std::string username);
 

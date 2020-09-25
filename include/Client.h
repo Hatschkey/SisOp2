@@ -32,7 +32,7 @@ class Client : protected BaseSocket
     static int  server_socket;              // Socket for remote server communication
     struct sockaddr_in server_address;      // Server socket address
 
-    static pthread_t input_handler_thread;         // Thread to listen for new incoming server messages
+    static pthread_t input_handler_thread;  // Thread to listen for new incoming server messages
 
     // Public methods
     public:

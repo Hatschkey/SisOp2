@@ -6,6 +6,7 @@ std::atomic<bool> Server::stop_issued;
 typedef void (*command_function)(void);
 std::map<std::string,command_function> Server::available_commands;
 int Server::message_history;
+int Server::server_socket;
 
 std::map<int, pthread_t> Server::connection_handler_threads;
 RW_Monitor Server::threads_monitor;
@@ -24,6 +25,7 @@ Server::Server(int N)
     available_commands.insert(std::make_pair("list users", &User::listUsers));
     available_commands.insert(std::make_pair("list groups", &Group::listGroups));
     available_commands.insert(std::make_pair("list threads",&Server::listThreads));
+    available_commands.insert(std::make_pair("stop", &Server::issueStop));
     available_commands.insert(std::make_pair("help", &Server::listCommands));
 
     // Setup socket
@@ -126,7 +128,7 @@ void *Server::handleCommands(void* arg)
     }
 
     // Signal all other threads to end
-    stop_issued = true;
+    Server::issueStop();
 
     pthread_exit(NULL);
 }
@@ -139,6 +141,8 @@ void *Server::handleConnection(void* arg)
     char           server_message[PACKET_MAX];  // Buffer for messages the server will send to the client, max PACKET_MAX bytes
     login_payload* login_payload_buffer;        // Buffer for client login information
     std::string    message;                     // User chat message
+    std::string    username;                    // Connected user's name
+    std::string    groupname;                   // Connected group's name
 
     char message_records[PACKET_MAX*Server::message_history];
     message_record* read_message;
@@ -153,14 +157,12 @@ void *Server::handleConnection(void* arg)
         // Decode received data into a packet structure
         packet* received_packet = (packet *)client_message;
 
-        //std::cout << "Received packet of type " << received_packet->type << " with " << read_bytes << " bytes" << std::endl;
-
         // Decide action according to packet type
         switch (received_packet->type)
         {
             case PAK_DATA:   // Data packet            
                 // Say the message to the group
-                if (user != NULL && group != NULL)
+                if (user != NULL && group != NULL && !stop_issued)
                     user->say(received_packet->_payload, group->groupname);
                 break;
 
@@ -176,24 +178,37 @@ void *Server::handleConnection(void* arg)
                 if ( (user = User::getUser(login_payload_buffer->username)) == NULL)
                     user = new User(login_payload_buffer->username);
 
+                // Update connected user and groupname
+                groupname = group->groupname;
+                username = user->username;
+
                 // Try to join that group with this user
                 if (user->joinGroup(group, socket) != 0)
                 {
+                    // Initialize message records buffer
+                    bzero(message_records, PACKET_MAX * Server::message_history);
+
                     // Recover message history for this user
                     read_messages = group->recoverHistory(message_records, Server::message_history, user);
 
+                    // Iterate through the buffer
                     for (int i = 0; i < read_messages; i++)
                     {
+                        // Decode the buffer data into a message record
                         read_message = (message_record*)(message_records + offset);
 
+                        // Clear the buffer and copy the new data into it
+                        bzero(server_message, PACKET_MAX);
                         memcpy(server_message, message_records + offset, sizeof(message_record) + read_message->length);
 
-                        sendPacket(socket, PAK_DATA, server_message, sizeof(message_record) + ((message_record*)server_message)->length);
+                        // Send the old message to the connected client
+                        sendPacket(socket, PAK_DATA, server_message, sizeof(message_record) + read_message->length);
 
-                        offset += sizeof(message_record) + ((message_record*)server_message)->length;
+                        // Go forward in the buffer
+                        offset += sizeof(message_record) + read_message->length;
                     }
 
-                    if (user->getSessionCount() == 1) 
+                    if (!stop_issued && user->getSessionCount() == 1) 
                     {
                         message = "User [" + user->username + "] has joined.";
                         group->broadcastMessage(message ,user->username);
@@ -218,39 +233,50 @@ void *Server::handleConnection(void* arg)
                 break;
 
             default:
-                //std::cerr << "Unknown packet type received" << std::endl;
                 break;
         }
 
         // Clear buffers to receive and send new packets
-        for (int i=0; i < PACKET_MAX; i++)
-        {
-            client_message[i] = '\0';
-            server_message[i] = '\0';
-        }
+        for (int i = 0; i < PACKET_MAX*Server::message_history; i++) message_records[i] = '\0';
+
+        // Clear the buffer
+        bzero(client_message, PACKET_MAX);
     }   
     
-    // Shows a disconnect message when the last user client logouts
-    if (user->getSessionCount() == 1) 
-    {
-        message = "User [" + user->username + "] has disconnected.";
-        group->broadcastMessage(message ,user->username);
-    }
-
     // Leave group with this user
     user->leaveGroup(group, socket);
+
+    // Request read rights
+    User::active_users_monitor.requestRead();
+    Group::active_groups_monitor.requestRead();
+
+    // Check if the user doesn't exist, the group still exists, and server was not stopped
+    if (User::active_users.find(username) == User::active_users.end()   &&
+        Group::active_groups.find(groupname) != Group::active_groups.end() &&
+        !stop_issued)
+    {
+        message = "User [" + username + "] has disconnected.";
+        group->broadcastMessage(message ,username);
+    }
+
+    // Release read rights
+    User::active_users_monitor.releaseRead();
+    Group::active_groups_monitor.releaseRead();
 
     // Free received argument
     free(arg);
 
-    // Request write rights
-    threads_monitor.requestWrite();
+    if (!stop_issued)
+    {
+        // Request write rights
+        threads_monitor.requestWrite();
 
-    // Remove itself from the threads list
-    connection_handler_threads.erase(socket);
+        // Remove itself from the threads list
+        connection_handler_threads.erase(socket);
 
-    // Release write rights
-    threads_monitor.releaseWrite();
+        // Release write rights
+        threads_monitor.releaseWrite();
+    }
 
     // Exit
     pthread_exit(NULL);
@@ -287,4 +313,21 @@ void Server::listThreads()
     }
 
     threads_monitor.releaseRead();
+}
+
+void Server::issueStop()
+{
+
+    Server::stop_issued = true;
+
+    Server::threads_monitor.requestRead();
+
+    // Stop all thread sockets
+    for (std::map<int, pthread_t>::iterator i = connection_handler_threads.begin(); i != connection_handler_threads.end(); ++i)
+    {
+        shutdown(i->first, SHUT_RDWR);
+        shutdown(Server::server_socket, SHUT_RDWR);
+    }
+
+    Server::threads_monitor.releaseRead();
 }
