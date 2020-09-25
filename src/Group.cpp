@@ -52,38 +52,28 @@ Group::~Group()
 Group* Group::getGroup(std::string groupname)
 {
     Group* group; // Reference to the group
+    int exists = 0;
 
     try
     {
-        // Request read rights
-        Group::active_groups_monitor.requestRead();
-
         // Try to find groupname in map
         group = active_groups.at(groupname);
 
+        exists = 1;
     }
     catch(const std::out_of_range& e)
     {
         // If reached end of map, group is not there
-        group = NULL;
+        exists = 0;
     }
 
-    // Release read rights
-    Group::active_groups_monitor.releaseRead();
-
-    return group;
+    return exists? group : new Group(groupname);
 }
 
 void Group::addGroup(Group* group)
 {
-    // Request write rights
-    Group::active_groups_monitor.requestWrite();
-
     // Insert in group map
     active_groups.insert(std::make_pair(group->groupname, group));
-
-    // Release the write rights
-    Group::active_groups_monitor.releaseWrite();
 }
 
 int Group::removeGroup(std::string groupname)
@@ -119,6 +109,29 @@ void Group::listGroups()
 
     // Release read rights
     Group::active_groups_monitor.releaseRead();
+}
+
+int Group::joinByName(std::string username, std::string groupname, User** user, Group** group, int socket_id)
+{
+    int status = 0; // Status indicating if the user was able to join the group
+
+    // Request read rights
+    Group::active_groups_monitor.requestWrite();
+    User::active_users_monitor.requestWrite();
+
+    // Get user and group reference
+    *user = User::getUser(username);
+    *group = Group::getGroup(groupname);
+
+    // Try to join the group with that user
+    status = (*user)->joinGroup(*group, socket_id);
+
+    // Release read rights
+    Group::active_groups_monitor.releaseWrite();
+    User::active_users_monitor.releaseWrite();
+
+    // Return join status
+    return status;
 }
 
 void Group::addUser(User* user)

@@ -174,21 +174,13 @@ void *Server::handleConnection(void* arg)
                 // Get user login information
                 login_payload_buffer = (login_payload*)received_packet->_payload;              
 
-                // Check if this group is already active, and create one if not
-                if ( (group = Group::getGroup(login_payload_buffer->groupname)) == NULL)
-                    group = new Group(login_payload_buffer->groupname);
-
-                // Check if this user is logged in already, and create one if not
-                if ( (user = User::getUser(login_payload_buffer->username)) == NULL)
-                    user = new User(login_payload_buffer->username);
-
-                // Update connected user and groupname
-                groupname = group->groupname;
-                username = user->username;
-
                 // Try to join that group with this user
-                if (user->joinGroup(group, socket) != 0)
+                if (Group::joinByName(login_payload_buffer->username, login_payload_buffer->groupname, &user, &group, socket) != 0)
                 {
+                    // Update connected user and groupname
+                    groupname = group->groupname;
+                    username = user->username;
+
                     // Initialize message records buffer
                     bzero(message_records, PACKET_MAX * Server::message_history);
 

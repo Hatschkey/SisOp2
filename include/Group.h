@@ -54,6 +54,18 @@ class Group : protected CommunicationUtils
      */
     static void listGroups();
 
+    /**
+     * Safely joins the group 'goroupname' with the user 'username', protecting the entire process
+     * of creatig the user/group and joining using monitors
+     * @param username  Name of the user
+     * @param groupname Name of the group
+     * @param user      Pointer to the pointer that will be filled when getting the user
+     * @param group     Pointer to the pointer that will be filled when getting the group
+     * @param socket_id Socket where the connection is comming from
+     * @returns  1 if join was sucessful, 0 otherwise
+     */
+    static int joinByName(std::string username, std::string groupname, User** user, Group** group, int socket_id);
+
     // These non-static methods are related to an instance of group
 
     /**

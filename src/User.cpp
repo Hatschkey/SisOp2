@@ -6,37 +6,28 @@ RW_Monitor User::active_users_monitor;
 User* User::getUser(std::string username)
 {
     User* user; // Reference to the user
+    int exists = 0;
 
     try
     {
-        // Request read rights
-        active_users_monitor.requestRead();
-
         // Try to find username in map
         user = active_users.at(username);
+
+        exists = 1;
     }
     catch(const std::out_of_range& e)
     {
         // If reached end of map, user is not there
-        user = NULL;
+        exists = 0;
     }
 
-    // Release read rights
-    active_users_monitor.releaseRead();
-
-    return user;
+    return exists? user : new User(username);
 };
 
 void User::addUser(User* user)
 {
-    // Request write rights
-    active_users_monitor.requestWrite();
-
     // Insert user in map
     active_users.insert(std::make_pair(user->username,user));
-
-    // Release write rights
-    active_users_monitor.releaseWrite();
 }
 
 int User::removeUser(std::string username)
@@ -202,8 +193,14 @@ int User::leaveGroup(Group* group, int socket_id)
 
 int User::say(std::string message, std::string groupname)
 {
+    // Request read rights
+    Group::active_groups_monitor.requestRead();
+
     // Fetch the group
     Group* group = Group::getGroup(groupname);
+
+    // Release read rights
+    Group::active_groups_monitor.releaseRead();
 
     // "Posts" a message to group, along with sender username
     if (group != NULL)
