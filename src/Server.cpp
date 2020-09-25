@@ -56,7 +56,7 @@ void Server::listenConnections()
     // TODO Change from 'accept' to a non blocking method, so thread may be stopped safely
     int sockaddr_size = sizeof(struct sockaddr_in);
     int* new_socket;
-    while(!stop_issued && (client_socket = accept(server_socket, (struct sockaddr*)&client_address, (socklen_t*)&sockaddr_size)) )
+    while(!stop_issued && (client_socket = accept(server_socket, (struct sockaddr*)&client_address, (socklen_t*)&sockaddr_size)) > 0 )
     {
         //std::cout << "New connection accepted from client " << client_socket << std::endl;
 
@@ -128,7 +128,7 @@ void *Server::handleCommands(void* arg)
     }
 
     // Signal all other threads to end
-    Server::issueStop();
+    if (!stop_issued) Server::issueStop();
 
     pthread_exit(NULL);
 }
@@ -236,15 +236,14 @@ void *Server::handleConnection(void* arg)
                 break;
         }
 
-        // Clear buffers to receive and send new packets
-        for (int i = 0; i < PACKET_MAX*Server::message_history; i++) message_records[i] = '\0';
-
-        // Clear the buffer
+        // Clear the buffers
         bzero(client_message, PACKET_MAX);
+        bzero(message_records, PACKET_MAX * Server::message_history);
     }   
     
     // Leave group with this user
-    user->leaveGroup(group, socket);
+    std::cout << "Going to leave the group " << groupname << " with user " << username << " on thread " << socket << std::endl;
+    user->leaveGroup(group, socket); // TODO This is being executed twice for some reason?
 
     // Request read rights
     User::active_users_monitor.requestRead();
@@ -318,16 +317,22 @@ void Server::listThreads()
 void Server::issueStop()
 {
 
+    // Issue a stop command to all running threads
     Server::stop_issued = true;
 
+    // Request read rights
     Server::threads_monitor.requestRead();
 
-    // Stop all thread sockets
+    // Stop all communication with clients
     for (std::map<int, pthread_t>::iterator i = connection_handler_threads.begin(); i != connection_handler_threads.end(); ++i)
     {
         shutdown(i->first, SHUT_RDWR);
-        shutdown(Server::server_socket, SHUT_RDWR);
     }
 
+    // Release read rights
     Server::threads_monitor.releaseRead();
+
+    // Stop the main socket from receiving connections
+    shutdown(Server::server_socket, SHUT_RDWR);
+
 }

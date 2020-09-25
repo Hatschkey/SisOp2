@@ -22,7 +22,7 @@ class User : protected BaseSocket
     static RW_Monitor active_users_monitor; // Monitor for active users
 
     std::string username; // User display name
-    int last_seen; // Last time a message was received from this user
+    uint64_t last_seen; // Last time a message was received from this user
     std::map<std::string, int> joined_groups; // Groups this user instance has joined and how many sessions are active in each group
     RW_Monitor joined_groups_monitor;   // Monitor for joined groups
     
