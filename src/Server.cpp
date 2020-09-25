@@ -40,7 +40,13 @@ Server::~Server()
 
 void Server::listenConnections()
 {
-    int client_socket = -1;
+    int client_socket = -1; // Socket assigned to each client on accept
+    
+    // Create struct for socket timeout and set USER_TIMEOUT seconds
+    struct timeval timeout_timer;
+    timeout_timer.tv_sec = USER_TIMEOUT;
+    timeout_timer.tv_usec = 0;
+
     // Set passive listen socket
     if ( listen(server_socket, 3) < 0)
         throw std::runtime_error(appendErrorMessage("Error setting socket as passive listener"));
@@ -57,14 +63,16 @@ void Server::listenConnections()
     int* new_socket;
     while(!stop_issued && (client_socket = accept(server_socket, (struct sockaddr*)&client_address, (socklen_t*)&sockaddr_size)) > 0 )
     {
-        //std::cout << "New connection accepted from client " << client_socket << std::endl;
-
         // Start new thread for new connection
         pthread_t comm_thread;
 
         // Get reference to client socket
         new_socket = (int*)malloc(sizeof(int));
         *new_socket = client_socket;
+
+        // Set the keep-alive timer on the socket
+        if (setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout_timer, sizeof(timeout_timer)) < 0 )
+            throw std::runtime_error(appendErrorMessage("Error setting socket options"));
 
         // Spawn new thread for handling that client
         if (pthread_create( &comm_thread, NULL, handleConnection, (void*)new_socket) < 0)
@@ -87,12 +95,22 @@ void Server::listenConnections()
     // Request read rights
     threads_monitor.requestRead();
 
+    // Socket associated with each thread
+    int thread_socket = -1;
+
     // Wait for all threads to finish
     for (std::map<int, pthread_t>::iterator i = connection_handler_threads.begin(); i != connection_handler_threads.end(); ++i)
     {
+
         std::cout << "Waiting for client communication to end on socket " << i->first << "..." << std::endl;
-        pthread_t* ref = &(i->second);
-        pthread_join(*ref, NULL);
+        // Get the thread reference
+        pthread_join(i->second, NULL);
+
+        // Save the thread number
+        thread_socket = i->first;
+        
+        // Remove this ended thread from the thread list
+        connection_handler_threads.erase(thread_socket);
     }
 
     std::cout << "Waiting for command handler to end..." << std::endl;
@@ -164,10 +182,18 @@ void *Server::handleConnection(void* arg)
         // Decide action according to packet type
         switch (received_packet->type)
         {
-            case PAK_DATA:   // Data packet            
-                // Say the message to the group
+            case PAK_DATA:   // Data packet
+
+                // If user and group still exist
                 if (user != NULL && group != NULL && !stop_issued)
+                {
+                    // Update user's last seen variable
+                    user->setLastSeen();
+
+                    // Say message to the group
                     user->say(received_packet->_payload, group->groupname);
+                }
+                
                 break;
 
             case PAK_COMMAND:   // Command packet (login)
@@ -204,7 +230,7 @@ void *Server::handleConnection(void* arg)
                         offset += sizeof(message_record) + read_message->length;
                     }
 
-                    if (!stop_issued && user->getSessionCount() == 1) 
+                    if (!stop_issued && user->getSessionCount(groupname) == 1) 
                     {
                         message = "User [" + user->username + "] has joined.";
                         group->broadcastMessage(message ,user->username);
@@ -223,12 +249,25 @@ void *Server::handleConnection(void* arg)
                     // Free received argument pointer
                     free(arg);
 
+                    // Request write rights
+                    threads_monitor.requestWrite();
+
+                    // Remove itself from the threads list
+                    connection_handler_threads.erase(socket);
+
+                    // Release write rights
+                    threads_monitor.releaseWrite();
+
                     // Exit
                     pthread_exit(NULL);
                 }
                 break;
-
+            case PAK_KEEP_ALIVE: // Keep-alive packet
+                // Set user last seen variable, and do nothing else
+                user->setLastSeen();
+                break;
             default:
+                std::cout << "Unkown packet received from socket at " <<  socket << std::endl;
                 break;
         }
 
@@ -238,8 +277,16 @@ void *Server::handleConnection(void* arg)
     }
     
     // Leave group with this user
-    user->leaveGroup(group, socket);
+    if (user != NULL) user->leaveGroup(group, socket);
     
+    // Check if connection ended due to timeout
+    if(errno == EAGAIN || errno == EWOULDBLOCK)
+    {
+        // If so, close the connection for good
+        // TODO Maybe inform client somehow?
+        close(socket);
+    }
+
     // Request read rights
     User::active_users_monitor.requestRead();
     Group::active_groups_monitor.requestRead();

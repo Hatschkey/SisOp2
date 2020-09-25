@@ -69,6 +69,13 @@ class User : protected CommunicationUtils
     int getSessionCount();
 
     /**
+     * Returns the current session count for this user instance in the specified group
+     * @param groupname Name of the group
+     * @return Amount of active sessions in that group
+     */
+    int getSessionCount(std::string groupname);
+
+    /**
      * Tries to join the given group, if the session count allows for it
      * @param group Instance of a Group class
      * @param socket_id Identifier for the socket corresponding to the session thread
@@ -103,6 +110,11 @@ class User : protected CommunicationUtils
      * @returns 
      */
     int signalNewMessage(std::string message, std::string username, std::string groupname, int packet_type);
+
+    /**
+     * Updates the user's last seen attribute to current time
+     */
+    void setLastSeen();
 };
 
 #endif

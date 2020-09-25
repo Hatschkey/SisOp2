@@ -3,6 +3,9 @@
 std::atomic<bool> Client::stop_issued;
 int Client::server_socket;
 pthread_t Client::input_handler_thread;
+pthread_t Client::keep_alive_thread;
+std::string Client::username;
+RW_Monitor Client::socket_monitor;
 
 Client::Client(std::string username, std::string groupname, std::string server_ip, std::string server_port)
 {
@@ -72,6 +75,9 @@ void Client::setupConnection()
 
     // Start user input getter thread
     pthread_create(&input_handler_thread, NULL, handleUserInput, NULL);
+
+    // Start keep-alive thread
+    pthread_create(&keep_alive_thread, NULL, keepAlive, NULL);
 };
 
 void Client::getMessages()
@@ -163,8 +169,9 @@ void Client::getMessages()
     // Signal input handler to stop
     stop_issued = true;
 
-    // Wait for thread to finish
+    // Wait for other threads to finish
     pthread_join(Client::input_handler_thread,NULL);
+    pthread_join(Client::keep_alive_thread, NULL);
 };
 
 void *Client::handleUserInput(void* arg)
@@ -175,7 +182,7 @@ void *Client::handleUserInput(void* arg)
     fflush(stdin);
 
     // Get user messages to be sent until Ctrl D is pressed
-    char user_message[MESSAGE_MAX];
+    char user_message[MESSAGE_MAX + 1];
     do
     {
         // Get user message
@@ -188,11 +195,16 @@ void *Client::handleUserInput(void* arg)
 
             if (strlen(user_message) > 0) 
  	        {
+                // Request write rights
+                socket_monitor.requestWrite();
+
                 // Prepare message payload
                 char* payload = user_message + '\0';
                 payload_size = strlen(payload) + 1;
                 CommunicationUtils::sendPacket(server_socket, PAK_DATA, payload, payload_size);
 
+                // Release write rights
+                socket_monitor.releaseWrite();
             }
 
         }
@@ -214,3 +226,27 @@ void *Client::handleUserInput(void* arg)
     pthread_exit(NULL);
 };
 
+void *Client::keepAlive(void* arg)
+{
+    // Useless message that will be sent to server to keep connection going
+    char keep_alive = '\0';
+
+    while(!stop_issued)
+    {
+        // Sleep for SLEEP_TIME seconds between attempting to send messages to the server
+        sleep(SLEEP_TIME);
+    
+        // Request write rights
+        socket_monitor.requestWrite();
+    
+        // Send message
+        CommunicationUtils::sendPacket(Client::server_socket, PAK_KEEP_ALIVE, &keep_alive, sizeof(keep_alive));
+
+        // Release write rights
+        socket_monitor.releaseWrite();
+
+    }
+
+    // Exit
+    pthread_exit(NULL);
+}

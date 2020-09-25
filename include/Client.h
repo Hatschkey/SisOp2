@@ -12,10 +12,12 @@
 #include <iostream>
 #include <atomic>
 #include <pthread.h>
+#include <unistd.h>
 
 #include "constants.h"
 #include "data_types.h"
 #include "CommunicationUtils.h"
+#include "RW_Monitor.h"
 
 #include "ClientInterface.h"
 
@@ -25,7 +27,7 @@ class Client : protected CommunicationUtils
     private:
 
     static std::atomic<bool> stop_issued;   // Atomic flag for stopping all threads
-    std::string username;                   // Client display name
+    static std::string username;            // Client display name
     std::string groupname;                  // Group the client wishes to join
     std::string server_ip;                  // IP of the remote server
     int         server_port;                // Port the remote server listens at
@@ -33,6 +35,9 @@ class Client : protected CommunicationUtils
     struct sockaddr_in server_address;      // Server socket address
 
     static pthread_t input_handler_thread;  // Thread to listen for new incoming server messages
+    static pthread_t keep_alive_thread;     // Thread to keep the client "alive" by sending periodic messages to server
+
+    static RW_Monitor socket_monitor;       // Monitor that controls the sending of data through the socket
 
     // Public methods
     public:
@@ -68,6 +73,11 @@ class Client : protected CommunicationUtils
      * This should run in a separate thread to getMessages
      */
     static void *handleUserInput(void* arg);
+
+    /**
+     * Loops sending messages to server in order to keep the connection "alive"
+     */
+    static void *keepAlive(void* arg);
 };
 
 #endif

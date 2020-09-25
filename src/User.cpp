@@ -94,6 +94,31 @@ int User::getSessionCount()
     return total_sessions;
 }
 
+int User::getSessionCount(std::string groupname)
+{
+    int group_sessions; // Number of sessions in that group
+
+    // Request read rights
+    joined_groups_monitor.requestRead();
+
+    try
+    {
+        // Get sessions in that group
+        group_sessions = this->joined_groups.at(groupname);
+    }
+    catch(const std::out_of_range& e)
+    {
+        // If user is not connected to that group return 0    
+        group_sessions = 0;
+    }
+
+    // Release read rights
+    joined_groups_monitor.releaseRead();
+
+    // Return session count
+    return group_sessions;
+}
+
 int User::joinGroup(Group* group, int socket_id)
 {
     // Check for user session count
@@ -242,4 +267,10 @@ int User::signalNewMessage(std::string message, std::string username, std::strin
     free(msg);
 
     return 1;
+}
+
+void User::setLastSeen()
+{
+    // Update variable
+    this->last_seen = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 }
