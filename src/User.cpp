@@ -140,6 +140,15 @@ int User::leaveGroup(Group* group, int socket_id)
     // Remove the group from this user's group list
     this->joined_groups.at(group->groupname)--;
 
+    // Request write rights
+    group_sockets_monitor.requestWrite();
+
+    // Remove session thread from vector
+    group_sockets.erase(socket_id);
+
+    // Release write rights
+    group_sockets_monitor.releaseWrite();
+    
     // Check if any sessions are left in that group
     if (this->joined_groups.at(group->groupname) == 0)
     {
@@ -161,15 +170,6 @@ int User::leaveGroup(Group* group, int socket_id)
             // Release write rights
             active_users_monitor.releaseWrite();
             joined_groups_monitor.releaseWrite();
-
-            // Request write rights
-            group_sockets_monitor.requestWrite();
-
-            // Remove session thread from vector
-            group_sockets.erase(socket_id);
-
-            // Release write rights
-            group_sockets_monitor.releaseWrite();
 
             // And delete itself
             delete(this);

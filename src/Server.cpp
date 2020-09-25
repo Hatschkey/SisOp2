@@ -235,7 +235,7 @@ void *Server::handleConnection(void* arg)
         // Clear the buffers
         bzero(client_message, PACKET_MAX);
         bzero(message_records, PACKET_MAX * Server::message_history);
-    }   
+    }
     
     // Leave group with this user
     user->leaveGroup(group, socket);
