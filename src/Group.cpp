@@ -245,7 +245,7 @@ void Group::saveMessage(std::string message, std::string username, int message_t
     long message_count = -1; // Number of messages already present in the file
 
     // Compose the message
-    message_record* msg = CommunicationUtils::composeMessage(username, message,  0);
+    message_record* msg = CommunicationUtils::composeMessage(username, message, message_type);
 
     // Calculate message size
     record_size = sizeof(*msg) + msg->length;
