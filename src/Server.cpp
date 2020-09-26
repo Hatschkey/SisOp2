@@ -208,7 +208,7 @@ void *Server::handleConnection(void* arg)
                     username = user->username;
 
                     // Initialize message records buffer
-                    bzero(message_records, PACKET_MAX * Server::message_history);
+                    bzero((void*)message_records, PACKET_MAX * Server::message_history);
 
                     // Recover message history for this user
                     read_messages = group->recoverHistory(message_records, Server::message_history, user);
@@ -220,7 +220,7 @@ void *Server::handleConnection(void* arg)
                         read_message = (message_record*)(message_records + offset);
 
                         // Clear the buffer and copy the new data into it
-                        bzero(server_message, PACKET_MAX);
+                        bzero((void*)server_message, PACKET_MAX);
                         memcpy(server_message, message_records + offset, sizeof(message_record) + read_message->length);
 
                         // Send the old message to the connected client
@@ -272,8 +272,8 @@ void *Server::handleConnection(void* arg)
         }
 
         // Clear the buffers
-        bzero(client_message, PACKET_MAX);
-        bzero(message_records, PACKET_MAX * Server::message_history);
+        bzero((void*)client_message, PACKET_MAX);
+        bzero((void*)message_records, PACKET_MAX * Server::message_history);
     }
     
     // Leave group with this user

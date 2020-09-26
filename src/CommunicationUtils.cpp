@@ -15,7 +15,7 @@ int CommunicationUtils::sendPacket(int socket, int packet_type, char* payload, i
 
     // Prepare packet
     packet* data = (packet*)malloc(packet_size);          // Malloc memory
-    bzero(data, packet_size);                             // Initialize bytes to zero
+    bzero((void*)data, packet_size);                             // Initialize bytes to zero
     data->type      = packet_type;                        // Signal that a data packet is being sent
     data->sqn       = 1;                                  // TODO Keep track of sequence numbers
     data->timestamp = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()); // Current timestamp
@@ -42,7 +42,7 @@ message_record* CommunicationUtils::composeMessage(std::string sender_name, std:
 
     // Create a record for the message
     message_record* msg = (message_record*)malloc(record_size); // Malloc memory
-    bzero(msg, record_size);                                    // Initialize bytes to zero
+    bzero((void*)msg, record_size);                                    // Initialize bytes to zero
     strcpy(msg->username,sender_name.c_str());                  // Copy sender name
     msg->timestamp = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()); // Current timestamp
     msg->length = message_content.length() + 1;                 // Update message length

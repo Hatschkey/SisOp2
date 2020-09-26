@@ -92,7 +92,7 @@ void Client::getMessages()
     std::string username;     // Name of the user who sent the message
 
     // Clear buffer to receive new packets
-    bzero(server_message, PACKET_MAX);
+    bzero((void*)server_message, PACKET_MAX);
 
     // Wait for messages from the server
     while(!stop_issued && (read_bytes = CommunicationUtils::receivePacket(server_socket, server_message, PACKET_MAX)) > 0)
@@ -165,7 +165,7 @@ void Client::getMessages()
         }
 
         // Clear buffer to receive new packets
-        bzero(server_message, PACKET_MAX);
+        bzero((void*)server_message, PACKET_MAX);
 
     }
     // If server closes connection

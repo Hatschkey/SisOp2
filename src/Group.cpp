@@ -330,8 +330,8 @@ int Group::recoverHistory(char* message_record_list, int n, User* user)
         current_message++;
 
         // Reset buffers for reading new messages
-        bzero(header_buffer, PACKET_MAX);
-        bzero(message_buffer, PACKET_MAX);
+        bzero((void*)header_buffer, PACKET_MAX);
+        bzero((void*)message_buffer, PACKET_MAX);
     }
 
     // Close file that was opened for reading
