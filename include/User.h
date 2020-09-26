@@ -10,22 +10,22 @@
 #include "data_types.h"
 #include "Group.h"
 #include "RW_Monitor.h"
-#include "BaseSocket.h"
+#include "CommunicationUtils.h"
 
 // Forward declare Group
 class Group;
 
-class User : protected BaseSocket
+class User : protected CommunicationUtils
 {
     public:
     static std::map<std::string, User*> active_users;   // Current active users
     static RW_Monitor active_users_monitor; // Monitor for active users
 
     std::string username; // User display name
-    int last_seen; // Last time a message was received from this user
+    uint64_t last_seen; // Last time a message was received from this user
     std::map<std::string, int> joined_groups; // Groups this user instance has joined and how many sessions are active in each group
     RW_Monitor joined_groups_monitor;   // Monitor for joined groups
-
+    
     std::map<int, std::string> group_sockets; // Map for group and sockets related to that group (Max MAX_SESSIONS)
     RW_Monitor group_sockets_monitor;  // Monitor for group to socket id map
 
@@ -69,6 +69,13 @@ class User : protected BaseSocket
     int getSessionCount();
 
     /**
+     * Returns the current session count for this user instance in the specified group
+     * @param groupname Name of the group
+     * @return Amount of active sessions in that group
+     */
+    int getSessionCount(std::string groupname);
+
+    /**
      * Tries to join the given group, if the session count allows for it
      * @param group Instance of a Group class
      * @param socket_id Identifier for the socket corresponding to the session thread
@@ -80,8 +87,9 @@ class User : protected BaseSocket
      * Tries to leave the given group
      * @param group Instance of the group the user wishes to leave
      * @param socket_id Identifier for the socket corresponding to the finishing thread
+     * @returns 1 if that was the last user in the group, 0 otherwise
      */
-    void leaveGroup(Group* group, int socket_id);
+    int leaveGroup(Group* group, int socket_id);
 
     /**
      * Sends a message said by this user to the group
@@ -103,6 +111,11 @@ class User : protected BaseSocket
      * @returns 
      */
     int signalNewMessage(std::string message, std::string username, std::string groupname, int packet_type, int message_type);
+
+    /**
+     * Updates the user's last seen attribute to current time
+     */
+    void setLastSeen();
 };
 
 #endif

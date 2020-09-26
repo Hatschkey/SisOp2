@@ -4,17 +4,19 @@
 #include <map>
 #include <string.h>
 #include <unistd.h>
+#include <list>
 
 #include "constants.h"
 #include "data_types.h"
 #include "User.h"
 #include "RW_Monitor.h"
-#include <list>
+#include "CommunicationUtils.h"
+
 
 // Forward declare User
 class User;
 
-class Group
+class Group : protected CommunicationUtils
 {
     public:
     static std::map<std::string, Group*> active_groups;  // Current active groups
@@ -52,6 +54,18 @@ class Group
      */
     static void listGroups();
 
+    /**
+     * Safely joins the group 'goroupname' with the user 'username', protecting the entire process
+     * of creatig the user/group and joining using monitors
+     * @param username  Name of the user
+     * @param groupname Name of the group
+     * @param user      Pointer to the pointer that will be filled when getting the user
+     * @param group     Pointer to the pointer that will be filled when getting the group
+     * @param socket_id Socket where the connection is comming from
+     * @returns  1 if join was sucessful, 0 otherwise
+     */
+    static int joinByName(std::string username, std::string groupname, User** user, Group** group, int socket_id);
+
     // These non-static methods are related to an instance of group
 
     /**
@@ -74,7 +88,7 @@ class Group
     /**
      * Remove the user corresponding to the given username
      * @param username Name of the user that should be removed from this group
-     * @return Number of deleted users, should always be either 1 or 0
+     * @return 1 if this was the last user in group, 0 otherwise
      */
     int removeUser(std::string username);
 

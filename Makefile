@@ -8,11 +8,11 @@ HIST_DIR := bin/hist/
 
 all: dirs ${BIN_DIR}client ${BIN_DIR}server
 
-${BIN_DIR}server: ${OBJ_DIR}RW_Monitor.o ${OBJ_DIR}User.o ${OBJ_DIR}Group.o ${OBJ_DIR}serverApp.o ${OBJ_DIR}BaseSocket.o
-	${CC} ${OBJ_DIR}serverApp.o ${OBJ_DIR}Server.o ${OBJ_DIR}RW_Monitor.o ${OBJ_DIR}User.o ${OBJ_DIR}Group.o ${OBJ_DIR}BaseSocket.o -o ${BIN_DIR}server -lpthread -Wall
+${BIN_DIR}server: ${OBJ_DIR}RW_Monitor.o ${OBJ_DIR}User.o ${OBJ_DIR}Group.o ${OBJ_DIR}serverApp.o ${OBJ_DIR}CommunicationUtils.o
+	${CC} ${OBJ_DIR}serverApp.o ${OBJ_DIR}Server.o ${OBJ_DIR}RW_Monitor.o ${OBJ_DIR}User.o ${OBJ_DIR}Group.o ${OBJ_DIR}CommunicationUtils.o -o ${BIN_DIR}server -lpthread -Wall
 
-${BIN_DIR}client: ${OBJ_DIR}ClientInterface.o ${OBJ_DIR}clientApp.o ${OBJ_DIR}BaseSocket.o
-	${CC} ${OBJ_DIR}ClientInterface.o ${OBJ_DIR}clientApp.o ${OBJ_DIR}Client.o ${OBJ_DIR}BaseSocket.o -o ${BIN_DIR}client -lncurses -lpthread -Wall
+${BIN_DIR}client: ${OBJ_DIR}ClientInterface.o ${OBJ_DIR}clientApp.o ${OBJ_DIR}CommunicationUtils.o ${OBJ_DIR}RW_Monitor.o
+	${CC} ${OBJ_DIR}ClientInterface.o ${OBJ_DIR}clientApp.o ${OBJ_DIR}Client.o ${OBJ_DIR}CommunicationUtils.o ${OBJ_DIR}RW_Monitor.o -o ${BIN_DIR}client -lncurses -lpthread -Wall
 	
 ${OBJ_DIR}serverApp.o: ${OBJ_DIR}Server.o ${SRC_DIR}serverApp.cpp ${INC_DIR}data_types.h ${INC_DIR}constants.h
 	${CC} -c ${SRC_DIR}serverApp.cpp -I ${INC_DIR} -o ${OBJ_DIR}serverApp.o -Wall
@@ -38,8 +38,8 @@ ${OBJ_DIR}RW_Monitor.o:
 ${OBJ_DIR}ClientInterface.o: ${SRC_DIR}ClientInterface.cpp ${INC_DIR}ClientInterface.h
 	${CC} -c ${SRC_DIR}ClientInterface.cpp -I ${INC_DIR} -o ${OBJ_DIR}ClientInterface.o -Wall
 
-${OBJ_DIR}BaseSocket.o: ${SRC_DIR}BaseSocket.cpp ${INC_DIR}BaseSocket.h
-	${CC} -c ${SRC_DIR}BaseSocket.cpp -I ${INC_DIR} -o ${OBJ_DIR}BaseSocket.o -Wall
+${OBJ_DIR}CommunicationUtils.o: ${SRC_DIR}CommunicationUtils.cpp ${INC_DIR}CommunicationUtils.h
+	${CC} -c ${SRC_DIR}CommunicationUtils.cpp -I ${INC_DIR} -o ${OBJ_DIR}CommunicationUtils.o -Wall
 
 dirs:
 	mkdir -p ${OBJ_DIR}

@@ -52,38 +52,28 @@ Group::~Group()
 Group* Group::getGroup(std::string groupname)
 {
     Group* group; // Reference to the group
+    int exists = 0;
 
     try
     {
-        // Request read rights
-        Group::active_groups_monitor.requestRead();
-
         // Try to find groupname in map
         group = active_groups.at(groupname);
 
+        exists = 1;
     }
     catch(const std::out_of_range& e)
     {
         // If reached end of map, group is not there
-        group = NULL;
+        exists = 0;
     }
 
-    // Release read rights
-    Group::active_groups_monitor.releaseRead();
-
-    return group;
+    return exists? group : new Group(groupname);
 }
 
 void Group::addGroup(Group* group)
 {
-    // Request write rights
-    Group::active_groups_monitor.requestWrite();
-
     // Insert in group map
     active_groups.insert(std::make_pair(group->groupname, group));
-
-    // Release the write rights
-    Group::active_groups_monitor.releaseWrite();
 }
 
 int Group::removeGroup(std::string groupname)
@@ -107,18 +97,48 @@ void Group::listGroups()
     // Request read rights
     Group::active_groups_monitor.requestRead();
 
+    // Delimiter
+    std::cout << "======================\n" << std::endl;
+    
     // Iterate map listing groups and their users
     for (std::map<std::string,Group*>::iterator i = active_groups.begin(); i != active_groups.end(); ++i)
     {
-        std::cout << std::endl;
         std::cout << "Groupname: " << i->second->groupname << std::endl;
         std::cout << "User count: " << i->second->getUserCount() << std::endl;
+        std::cout << "Users: " << std::endl;
         // List all users in the group
         i->second->listUsers();
+        std::cout << std::endl;
     }
+
+    // Delimiter
+    std::cout << "======================" << std::endl;
 
     // Release read rights
     Group::active_groups_monitor.releaseRead();
+}
+
+int Group::joinByName(std::string username, std::string groupname, User** user, Group** group, int socket_id)
+{
+    int status = 0; // Status indicating if the user was able to join the group
+
+    // Request read rights
+    Group::active_groups_monitor.requestWrite();
+    User::active_users_monitor.requestWrite();
+
+    // Get user and group reference
+    *user = User::getUser(username);
+    *group = Group::getGroup(groupname);
+
+    // Try to join the group with that user
+    status = (*user)->joinGroup(*group, socket_id);
+
+    // Release read rights
+    Group::active_groups_monitor.releaseWrite();
+    User::active_users_monitor.releaseWrite();
+
+    // Return join status
+    return status;
 }
 
 void Group::addUser(User* user)
@@ -135,13 +155,11 @@ void Group::addUser(User* user)
 
 int Group::removeUser(std::string username)
 {
-    int removed_users = 0;  // Amount of users that was removed
-
     // Request write rights
     this->users_monitor.requestWrite();
 
     // Erase user from vector
-    removed_users = users.erase(username);
+    users.erase(username);
 
     // Release write rights
     this->users_monitor.releaseWrite();
@@ -160,14 +178,13 @@ int Group::removeUser(std::string username)
         // Release write rights
         Group::active_groups_monitor.releaseWrite();
 
-        // Call desctructor
-        this->~Group();
-
         // And delete itself
-        free(this);
+        delete(this);
+
+        return 1;
     }
 
-    return removed_users;
+    return 0;
 }
 
 void Group::listUsers()
@@ -177,7 +194,7 @@ void Group::listUsers()
 
     // Iterate vector listing all users
     for (std::map<std::string, User*>::iterator i = users.begin(); i != users.end(); ++i)
-        std::cout << "User: " << i->second->username << std::endl;
+        std::cout << " - User: " << i->second->username << std::endl;
 
     // Release read rights
     this->users_monitor.releaseRead();
@@ -224,16 +241,14 @@ int Group::post(std::string message, std::string username)
 
 void Group::saveMessage(std::string message, std::string username, int message_type)
 {
-    // Create a record for the user message
-    message_record* msg = (message_record*)malloc(sizeof(*msg) + sizeof(char)*(strlen(message.c_str()) + 1));
-    sprintf(msg->username,"%s", username.c_str());  // Copy username
-    msg->timestamp = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()); // Current timestamp
-    msg->length = strlen(message.c_str()) + 1; // Update message length
-    msg->type = message_type;
-    sprintf((char*)msg->_message,"%s",message.c_str()); // Copy message
+    int record_size = -1;   // Size of the message that will be sent
+    long message_count = -1; // Number of messages already present in the file
 
-    // Calculate struct size
-    int record_size = sizeof(*msg) + sizeof(char) * (strlen(message.c_str()) + 1);
+    // Compose the message
+    message_record* msg = CommunicationUtils::composeMessage(username, message,  0);
+
+    // Calculate message size
+    record_size = sizeof(*msg) + msg->length;
 
     // Request writing rights
     history_file_monitor.requestWrite();
@@ -243,12 +258,11 @@ void Group::saveMessage(std::string message, std::string username, int message_t
     fwrite(msg, record_size, 1, this->history_file);
 
     // Update file header to increase message count
-    long message_counter = 0;
     fseek(this->history_file, 0, SEEK_SET);
-    fread(&message_counter,sizeof(long), 1,history_file);
-    message_counter++;
+    fread(&message_count, sizeof(long), 1, history_file);
+    message_count++;
     fseek(this->history_file, 0, SEEK_SET);
-    fwrite(&message_counter, sizeof(long), 1, history_file);
+    fwrite(&message_count, sizeof(long), 1, history_file);
 
     // Move pointer back to the end of the file
     fseek(this->history_file, 0, SEEK_END);
@@ -271,7 +285,6 @@ int Group::recoverHistory(char* message_record_list, int n, User* user)
     long current_message = 0; // Currently indexed message in the file
     int read_messages = 0; // Number of messages that were read and sent to user
     int offset = 0; // Number of bytes needed to shift after the insert of a message into the message_record_list
-    message_record* message; // A message_record object used to copy the message into the message_record_list buffer
 
     // Request reading rights
     history_file_monitor.requestRead();
@@ -288,20 +301,21 @@ int Group::recoverHistory(char* message_record_list, int n, User* user)
         // If the message is in the last N
         if (current_message >= total_messages - n)
         {
+
             // Read the associated message
             fread(message_buffer,((message_record*)header_buffer)->length, 1, hist);
 
-            message = (message_record*)malloc(sizeof(message_record) + sizeof(char)*(strlen(message_buffer) + 1));
-            sprintf(message->username, "%s", ((message_record*)header_buffer)->username);
-            message->length = ((message_record*)header_buffer)->length;
-            message->type = ((message_record*)header_buffer)->type;
-            message->timestamp = ((message_record*)header_buffer)->timestamp;
-            sprintf((char*)message->_message, "%s", message_buffer);
+            // Copy the message header into the buffer
+            memcpy(message_record_list + offset, header_buffer, sizeof(message_record));
 
-            memcpy(message_record_list + offset, (void*)message, sizeof(message_record) + message->length);
+            // Update the offset
+            offset += sizeof(message_record);
 
-            // offset for inserting a new message into the message_record_List buffer
-            offset += sizeof(message_record) + message->length;
+            // Copy the message payload into the buffer
+            memcpy(message_record_list + offset, message_buffer, ((message_record*)header_buffer)->length);
+
+            // Update the offset
+            offset += ((message_record*)header_buffer)->length;
 
             // Increase read message counter
             read_messages++;
@@ -315,14 +329,9 @@ int Group::recoverHistory(char* message_record_list, int n, User* user)
         // Increase current message
         current_message++;
 
-        free(message);
-
-        // Reset message buffer for reading new messages
-        for (int i=0; i < PACKET_MAX; i++)
-        {
-            header_buffer[i] = '\0';
-            message_buffer[i] = '\0';
-        }
+        // Reset buffers for reading new messages
+        bzero(header_buffer, PACKET_MAX);
+        bzero(message_buffer, PACKET_MAX);
     }
 
     // Close file that was opened for reading
@@ -337,14 +346,6 @@ int Group::recoverHistory(char* message_record_list, int n, User* user)
 
 int Group::broadcastMessage(std::string message, std::string username)
 {
-    // Is this necessary to instantiate a new message_record ? 
-    message_record* server_broadcast = (message_record*)malloc(sizeof(message_record) + sizeof(char) * message.length() + 1);
-    sprintf(server_broadcast->username, "%s", message.c_str());
-    server_broadcast->length = message.length() + 1;
-    server_broadcast->type = SERVER_MESSAGE;
-    server_broadcast->timestamp = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()); 
-    sprintf((char*)server_broadcast->_message, "%s", message.c_str());
-
     // Save message
     this->saveMessage(message, username, SERVER_MESSAGE);
 

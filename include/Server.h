@@ -16,9 +16,9 @@
 #include "data_types.h"
 #include "constants.h"
 #include "RW_Monitor.h"
-#include "BaseSocket.h"
+#include "CommunicationUtils.h"
 
-class Server : protected BaseSocket
+class Server : protected CommunicationUtils
 {
     // Private attributes
     private:
@@ -27,7 +27,7 @@ class Server : protected BaseSocket
     static std::map<std::string,command_function> available_commands; // All available administrator commands
 
     static std::atomic<bool> stop_issued; // Atomic thread for stopping all threads
-    int server_socket;  // Socket the server listens at for new incoming connections
+    static int server_socket;  // Socket the server listens at for new incoming connections
 
     struct sockaddr_in server_address;  // Server socket address
     struct sockaddr_in client_address;  // Client socket address
@@ -88,6 +88,11 @@ class Server : protected BaseSocket
      * assigned to
      */
     static void listThreads();
+
+    /**
+     * Sends a stop signal to the server threads 
+     */
+    static void issueStop();
 };
 
 #endif

@@ -10,6 +10,7 @@
 #define USER_TIMEOUT 60      // Time (in seconds) for user to be kept alive
 #define PACKET_MAX   2048    // Maximum size (in bytes) for a packet
 #define MESSAGE_MAX  256     // Maximum size (in bytes) for a user message
+#define SLEEP_TIME   10      // Time (in seconds) the client application waits between keep alive packets
 
 // Packet types
 #define PAK_DATA 1          // Message packet

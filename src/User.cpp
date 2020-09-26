@@ -6,37 +6,28 @@ RW_Monitor User::active_users_monitor;
 User* User::getUser(std::string username)
 {
     User* user; // Reference to the user
+    int exists = 0;
 
     try
     {
-        // Request read rights
-        active_users_monitor.requestRead();
-
         // Try to find username in map
         user = active_users.at(username);
+
+        exists = 1;
     }
     catch(const std::out_of_range& e)
     {
         // If reached end of map, user is not there
-        user = NULL;
+        exists = 0;
     }
 
-    // Release read rights
-    active_users_monitor.releaseRead();
-
-    return user;
+    return exists? user : new User(username);
 };
 
 void User::addUser(User* user)
 {
-    // Request write rights
-    active_users_monitor.requestWrite();
-
     // Insert user in map
     active_users.insert(std::make_pair(user->username,user));
-
-    // Release write rights
-    active_users_monitor.releaseWrite();
 }
 
 int User::removeUser(std::string username)
@@ -56,14 +47,19 @@ void User::listUsers()
     // Request read rights
     active_users_monitor.requestRead();
 
+    // Delimiter
+    std::cout << "======================\n" << std::endl;
+
     // Iterate map listing users
     for (std::map<std::string,User*>::iterator i = active_users.begin(); i != active_users.end(); ++i)
     {
-        std::cout << std::endl;
         std::cout << "Username: " << i->second->username << std::endl;
         std::cout << "Active sessions: " << i->second->getSessionCount() << std::endl;
         std::cout << "Last seen: " << std::ctime((time_t*)&(i->second->last_seen)) << std::endl;
     }
+
+    // Delimiter
+    std::cout << "======================" << std::endl;
 
     // Release read rights
     active_users_monitor.releaseRead();
@@ -96,6 +92,31 @@ int User::getSessionCount()
     joined_groups_monitor.releaseRead();
 
     return total_sessions;
+}
+
+int User::getSessionCount(std::string groupname)
+{
+    int group_sessions; // Number of sessions in that group
+
+    // Request read rights
+    joined_groups_monitor.requestRead();
+
+    try
+    {
+        // Get sessions in that group
+        group_sessions = this->joined_groups.at(groupname);
+    }
+    catch(const std::out_of_range& e)
+    {
+        // If user is not connected to that group return 0    
+        group_sessions = 0;
+    }
+
+    // Release read rights
+    joined_groups_monitor.releaseRead();
+
+    // Return session count
+    return group_sessions;
 }
 
 int User::joinGroup(Group* group, int socket_id)
@@ -141,7 +162,7 @@ int User::joinGroup(Group* group, int socket_id)
     return 0;
 }
 
-void User::leaveGroup(Group* group, int socket_id)
+int User::leaveGroup(Group* group, int socket_id)
 {
     // Request write rights
     joined_groups_monitor.requestWrite();
@@ -149,6 +170,15 @@ void User::leaveGroup(Group* group, int socket_id)
     // Remove the group from this user's group list
     this->joined_groups.at(group->groupname)--;
 
+    // Request write rights
+    group_sockets_monitor.requestWrite();
+
+    // Remove session thread from vector
+    group_sockets.erase(socket_id);
+
+    // Release write rights
+    group_sockets_monitor.releaseWrite();
+    
     // Check if any sessions are left in that group
     if (this->joined_groups.at(group->groupname) == 0)
     {
@@ -171,35 +201,36 @@ void User::leaveGroup(Group* group, int socket_id)
             active_users_monitor.releaseWrite();
             joined_groups_monitor.releaseWrite();
 
-            // Request write rights
-            group_sockets_monitor.requestWrite();
-
-            // Remove session thread from vector
-            group_sockets.erase(socket_id);
-
-            // Release write rights
-            group_sockets_monitor.releaseWrite();
-
             // And delete itself
-            free(this);
+            delete(this);
+
         }
         else
         {
             // Release write rights
             joined_groups_monitor.releaseWrite();
         }
+
     }
     else
     {
         // Release write rights
         joined_groups_monitor.releaseWrite();
     }
+
+    return 0;
 }
 
 int User::say(std::string message, std::string groupname)
 {
+    // Request read rights
+    Group::active_groups_monitor.requestRead();
+
     // Fetch the group
     Group* group = Group::getGroup(groupname);
+
+    // Release read rights
+    Group::active_groups_monitor.releaseRead();
 
     // "Posts" a message to group, along with sender username
     if (group != NULL)
@@ -210,29 +241,36 @@ int User::say(std::string message, std::string groupname)
 
 int User::signalNewMessage(std::string message, std::string username, std::string groupname, int packet_type, int message_type)
 {
-    int message_record_size = 0;
+    int message_record_size = 0; // Size of the composed message (in bytes)
 
-    // Create structure with message and metadata
-    message_record* msg = (message_record*)malloc(sizeof(message_record) + sizeof(char) * (message.length() + 1));
-    sprintf(msg->username, "%s", username.c_str());
-    msg->timestamp = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-    msg->type = message_type;
-    msg->length = message.length() + 1;
-    sprintf((char*)msg->_message, "%s", message.c_str());
+    // Compose a new message
+    message_record* msg = CommunicationUtils::composeMessage(username, message, 0 /* HERE!*/ );
 
-    // Calculate struct size
-    message_record_size = sizeof(message_record) + msg->length;
+    // Calculate message size
+    message_record_size = sizeof(*msg) + msg->length;
+
+    // Request read rights
+    group_sockets_monitor.requestRead();
 
     // Iterate through connected client sockets
     for (std::map<int, std::string>::iterator i = group_sockets.begin(); i != group_sockets.end(); ++i)
     {
         // If client is part of this group, send message
         if (groupname.compare(i->second) == 0)
-            BaseSocket::sendPacket(i->first, packet_type, (char*)msg, message_record_size);
+            CommunicationUtils::sendPacket(i->first, packet_type, (char*)msg, message_record_size);
     }
+
+    // Release read rights
+    group_sockets_monitor.releaseRead();
 
     // Free created structure
     free(msg);
 
     return 1;
+}
+
+void User::setLastSeen()
+{
+    // Update variable
+    this->last_seen = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 }

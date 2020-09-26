@@ -3,6 +3,9 @@
 std::atomic<bool> Client::stop_issued;
 int Client::server_socket;
 pthread_t Client::input_handler_thread;
+pthread_t Client::keep_alive_thread;
+std::string Client::username;
+RW_Monitor Client::socket_monitor;
 
 Client::Client(std::string username, std::string groupname, std::string server_ip, std::string server_port)
 {
@@ -68,16 +71,18 @@ void Client::setupConnection()
     payload_size = sizeof(lp);
 
     // Sends the command packet to the server
-    BaseSocket::sendPacket(server_socket, PAK_COMMAND, (char*)&lp, payload_size); 
+    CommunicationUtils::sendPacket(server_socket, PAK_COMMAND, (char*)&lp, payload_size); 
 
     // Start user input getter thread
     pthread_create(&input_handler_thread, NULL, handleUserInput, NULL);
+
+    // Start keep-alive thread
+    pthread_create(&keep_alive_thread, NULL, keepAlive, NULL);
 };
 
 void Client::getMessages()
 {
     int read_bytes = -1;                // Number of bytes read from the header
-    int payload_bytes = 0;              // Number of bytes read from the payload
     char server_message[PACKET_MAX];    // Buffer for message sent from server
     message_record* received_message;   // Pointer to a message record, used to decode received packet payload
     packet* received_packet;
@@ -87,19 +92,13 @@ void Client::getMessages()
     std::string username;     // Name of the user who sent the message
 
     // Clear buffer to receive new packets
-    for (int i=0; i < PACKET_MAX; i++) server_message[i] = '\0';
+    bzero(server_message, PACKET_MAX);
 
     // Wait for messages from the server
-    while(!stop_issued && (read_bytes = recv(server_socket, server_message, sizeof(packet), 0)) > 0)
+    while(!stop_issued && (read_bytes = CommunicationUtils::receivePacket(server_socket, server_message, PACKET_MAX)) > 0)
     {
         // Decode message into packet format
         received_packet = (packet*)server_message;
-
-        // Wait for the entire message to arrive
-        while (payload_bytes < received_packet->length)
-        {
-            payload_bytes += recv(server_socket, server_message + read_bytes, received_packet->length - payload_bytes, 0);
-        }
 
         // Try to read the rest of the payload from the socket stream
         switch(received_packet->type)
@@ -166,10 +165,8 @@ void Client::getMessages()
         }
 
         // Clear buffer to receive new packets
-        for (int i=0; i < PACKET_MAX; i++) server_message[i] = '\0';
+        bzero(server_message, PACKET_MAX);
 
-        // Reset number of bytes read from payload
-        payload_bytes = 0;
     }
     // If server closes connection
     if (read_bytes == 0)
@@ -177,8 +174,12 @@ void Client::getMessages()
         std::cout << "\nConnection closed." << std::endl;
     }
 
-    // Wait for thread to finish
+    // Signal input handler to stop
+    stop_issued = true;
+
+    // Wait for other threads to finish
     pthread_join(Client::input_handler_thread,NULL);
+    pthread_join(Client::keep_alive_thread, NULL);
 };
 
 void *Client::handleUserInput(void* arg)
@@ -189,7 +190,7 @@ void *Client::handleUserInput(void* arg)
     fflush(stdin);
 
     // Get user messages to be sent until Ctrl D is pressed
-    char user_message[MESSAGE_MAX];
+    char user_message[MESSAGE_MAX + 1];
     do
     {
         // Get user message
@@ -202,11 +203,16 @@ void *Client::handleUserInput(void* arg)
 
             if (strlen(user_message) > 0) 
  	        {
+                // Request write rights
+                socket_monitor.requestWrite();
+
                 // Prepare message payload
                 char* payload = user_message + '\0';
                 payload_size = strlen(payload) + 1;
-                BaseSocket::sendPacket(server_socket, PAK_DATA, payload, payload_size);
+                CommunicationUtils::sendPacket(server_socket, PAK_DATA, payload, payload_size);
 
+                // Release write rights
+                socket_monitor.releaseWrite();
             }
 
         }
@@ -228,3 +234,27 @@ void *Client::handleUserInput(void* arg)
     pthread_exit(NULL);
 };
 
+void *Client::keepAlive(void* arg)
+{
+    // Useless message that will be sent to server to keep connection going
+    char keep_alive = '\0';
+
+    while(!stop_issued)
+    {
+        // Sleep for SLEEP_TIME seconds between attempting to send messages to the server
+        sleep(SLEEP_TIME);
+    
+        // Request write rights
+        socket_monitor.requestWrite();
+    
+        // Send message
+        CommunicationUtils::sendPacket(Client::server_socket, PAK_KEEP_ALIVE, &keep_alive, sizeof(keep_alive));
+
+        // Release write rights
+        socket_monitor.releaseWrite();
+
+    }
+
+    // Exit
+    pthread_exit(NULL);
+}
