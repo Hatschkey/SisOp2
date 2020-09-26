@@ -244,7 +244,7 @@ int User::signalNewMessage(std::string message, std::string username, std::strin
     int message_record_size = 0; // Size of the composed message (in bytes)
 
     // Compose a new message
-    message_record* msg = CommunicationUtils::composeMessage(username, message, 0 /* HERE!*/ );
+    message_record* msg = CommunicationUtils::composeMessage(username, message, message_type);
 
     // Calculate message size
     message_record_size = sizeof(*msg) + msg->length;

@@ -45,6 +45,7 @@ message_record* CommunicationUtils::composeMessage(std::string sender_name, std:
     bzero(msg, record_size);                                    // Initialize bytes to zero
     strcpy(msg->username,sender_name.c_str());                  // Copy sender name
     msg->timestamp = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()); // Current timestamp
+    msg->type = message_type;
     msg->length = message_content.length() + 1;                 // Update message length
     strcpy((char*)msg->_message ,message_content.c_str());      // Copy message
 
