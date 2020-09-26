@@ -118,13 +118,21 @@ void Client::getMessages()
                 {
                     username = std::string("[") + received_message->username + "]";
                     sprintf(received_message->username,"%s",username.c_str());
-                }
+                }          
 
                 // Get time into a readable format
                 strftime(message_time, sizeof(message_time), "%H:%M:%S", std::localtime((time_t*)&received_message->timestamp));
 
+                if (received_message->type == SERVER_MESSAGE)
+                {
+                    chat_message = message_time + std::string(" ") + received_message->_message;
+                }
+                else if (received_message->type == USER_MESSAGE)
+                {
+                    chat_message = message_time + std::string(" ") + received_message->username + ": " + received_message->_message;
+                }
+
                 // Display message
-                chat_message = message_time + std::string(" ") + received_message->username + ": " + received_message->_message;
                 ClientInterface::printMessage(chat_message);
                 break;
 

@@ -220,7 +220,7 @@ int Group::post(std::string message, std::string username)
     int sent_messages = 0; // Number of messages that were sent
 
     // Save this message
-    this->saveMessage(message, username);
+    this->saveMessage(message, username, USER_MESSAGE);
 
     // Request read rights
     users_monitor.requestRead();
@@ -229,7 +229,7 @@ int Group::post(std::string message, std::string username)
     for (std::map<std::string, User*>::iterator i = users.begin(); i != users.end(); ++i)
     {
         // Signal each user instance in the group that a new message was posted
-        sent_messages += i->second->signalNewMessage(message, username, this->groupname, PAK_DATA);
+        sent_messages += i->second->signalNewMessage(message, username, this->groupname, PAK_DATA, USER_MESSAGE);
     }
 
     // Release read rights
@@ -239,9 +239,8 @@ int Group::post(std::string message, std::string username)
     return sent_messages;
 }
 
-void Group::saveMessage(std::string message, std::string username)
+void Group::saveMessage(std::string message, std::string username, int message_type)
 {
-
     int record_size = -1;   // Size of the message that will be sent
     long message_count = -1; // Number of messages already present in the file
 
@@ -348,14 +347,14 @@ int Group::recoverHistory(char* message_record_list, int n, User* user)
 int Group::broadcastMessage(std::string message, std::string username)
 {
     // Save message
-    this->saveMessage(message, username);
+    this->saveMessage(message, username, SERVER_MESSAGE);
 
     this->users_monitor.requestRead();
 
     // Send login/logout message to every connected users
     for (std::map<std::string, User*>::iterator i = users.begin(); i != users.end(); ++i)
     {
-        i->second->signalNewMessage(message, username, this->groupname, PAK_SERVER_MESSAGE);
+        i->second->signalNewMessage(message, username, this->groupname, PAK_SERVER_MESSAGE, SERVER_MESSAGE);
     }
 
     this->users_monitor.releaseRead();
