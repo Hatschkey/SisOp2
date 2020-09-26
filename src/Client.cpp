@@ -21,7 +21,9 @@ Client::Client(std::string username, std::string groupname, std::string server_i
     if (!std::regex_match(server_ip, std::regex(IP_REGEX)))
         throw std::invalid_argument("Invalid IP format");
 
-    // TODO Validate port maybe?
+    // Validate port
+    if (!std::regex_match(server_port, std::regex(PORT_REGEX)))
+        throw std::invalid_argument("Invalid port format");
 
     // Initialize values
     this->username = username;
