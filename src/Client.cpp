@@ -21,12 +21,14 @@ Client::Client(std::string username, std::string groupname, std::string server_i
     if (!std::regex_match(server_ip, std::regex(IP_REGEX)))
         throw std::invalid_argument("Invalid IP format");
 
-    // TODO Validate port maybe?
+    // Validate port
+    if (!std::regex_match(server_port, std::regex(PORT_REGEX)))
+        throw std::invalid_argument("Invalid Port format");
 
     // Initialize values
     this->username = username;
     this->groupname = groupname;
-    this->server_ip = server_ip;
+    this->server_ip = !server_ip.compare("localhost")? "127.0.0.1" : server_ip;
     this->server_port = stoi(server_port);
     this->server_socket = -1;
 
@@ -49,7 +51,7 @@ Client::~Client()
 
 void Client::setupConnection()
 {
-    int payload_size; // Payload size for the first packet(login packet)
+    message_record* login_record; // Record for sending login packet
 
     // Create socket
     if ( (server_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0)
@@ -64,14 +66,14 @@ void Client::setupConnection()
     if (connect(server_socket, (struct sockaddr *)&server_address, sizeof(server_address)) < 0)
         throw std::runtime_error(appendErrorMessage("Error connecting to server"));
 
-    // Prepare login content payload
-    login_payload lp;
-    sprintf(lp.username, "%s", username.c_str());
-    sprintf(lp.groupname, "%s", groupname.c_str());
-    payload_size = sizeof(lp);
+    // Prepare message record with login information
+    login_record = CommunicationUtils::composeMessage(username, std::string(groupname), LOGIN_MESSAGE);
 
     // Sends the command packet to the server
-    CommunicationUtils::sendPacket(server_socket, PAK_COMMAND, (char*)&lp, payload_size); 
+    CommunicationUtils::sendPacket(server_socket, PAK_COMMAND, (char*)login_record, sizeof(*login_record) + login_record->length); 
+
+    // Free login record
+    free(login_record);
 
     // Start user input getter thread
     pthread_create(&input_handler_thread, NULL, handleUserInput, NULL);
@@ -152,7 +154,11 @@ void Client::getMessages()
 
             case PAK_COMMAND: // Command packet (disconnect)
 
-                ClientInterface::printMessage(received_packet->_payload);
+                // Decode payload into a message record
+                received_message = (message_record*)received_packet->_payload;
+
+                // Show message to user
+                ClientInterface::printMessage(received_message->_message);
 
                 // Stop the client application
                 stop_issued = true;
@@ -171,20 +177,23 @@ void Client::getMessages()
     // If server closes connection
     if (read_bytes == 0)
     {
-        std::cout << "\nConnection closed." << std::endl;
+        ClientInterface::printMessage("Connection closed by the server");
     }
 
     // Signal input handler to stop
     stop_issued = true;
 
-    // Wait for other threads to finish
+    // Wait for input handler thread to finish
     pthread_join(Client::input_handler_thread,NULL);
+
+    // Wake up the keep-alive thread from it's sleep
+    pthread_cancel(Client::keep_alive_thread);
     pthread_join(Client::keep_alive_thread, NULL);
 };
 
 void *Client::handleUserInput(void* arg)
 {
-    int payload_size;
+    message_record* message;
     
     // Flush stdin so no empty message is sent
     fflush(stdin);
@@ -203,16 +212,20 @@ void *Client::handleUserInput(void* arg)
 
             if (strlen(user_message) > 0) 
  	        {
+                // Compose message
+                message = CommunicationUtils::composeMessage(username, std::string(user_message), USER_MESSAGE);
+
                 // Request write rights
                 socket_monitor.requestWrite();
 
-                // Prepare message payload
-                char* payload = user_message + '\0';
-                payload_size = strlen(payload) + 1;
-                CommunicationUtils::sendPacket(server_socket, PAK_DATA, payload, payload_size);
+                // Send message to server
+                CommunicationUtils::sendPacket(server_socket, PAK_DATA, (char*)message, sizeof(*message) + message->length);
 
                 // Release write rights
                 socket_monitor.releaseWrite();
+
+                // Free composed message
+                free(message);
             }
 
         }
@@ -244,15 +257,17 @@ void *Client::keepAlive(void* arg)
         // Sleep for SLEEP_TIME seconds between attempting to send messages to the server
         sleep(SLEEP_TIME);
     
-        // Request write rights
-        socket_monitor.requestWrite();
-    
-        // Send message
-        CommunicationUtils::sendPacket(Client::server_socket, PAK_KEEP_ALIVE, &keep_alive, sizeof(keep_alive));
+        if (!stop_issued)
+        {
+            // Request write rights
+            socket_monitor.requestWrite();
+        
+            // Send message
+            CommunicationUtils::sendPacket(Client::server_socket, PAK_KEEP_ALIVE, &keep_alive, sizeof(keep_alive));
 
-        // Release write rights
-        socket_monitor.releaseWrite();
-
+            // Release write rights
+            socket_monitor.releaseWrite();
+        }
     }
 
     // Exit

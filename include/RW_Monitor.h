@@ -12,9 +12,6 @@ class RW_Monitor
     pthread_cond_t ok_read, ok_write;           // Condition variables for reading and writing
     pthread_mutex_t lock;                       // Mutex lock for the incoming requests to wait
 
-    //std::unique_lock<std::mutex> lock;
-
-
     /**
      * Class constructor
      * Initializes num_readers and num_writers with 0 

@@ -161,7 +161,7 @@ void *Server::handleConnection(void* arg)
     int            read_bytes = -1;             // Number of bytes read from the message
     char           client_message[PACKET_MAX];  // Buffer for client message, maximum of PACKET_MAX bytes
     char           server_message[PACKET_MAX];  // Buffer for messages the server will send to the client, max PACKET_MAX bytes
-    login_payload* login_payload_buffer;        // Buffer for client login information
+    message_record* login_message;        // Buffer for client login information
     std::string    message;                     // User chat message
     std::string    username;                    // Connected user's name
     std::string    groupname;                   // Connected group's name
@@ -184,6 +184,9 @@ void *Server::handleConnection(void* arg)
         {
             case PAK_DATA:   // Data packet
 
+                // Decode received message into a message record
+                read_message = (message_record*)received_packet->_payload;
+
                 // If user and group still exist
                 if (user != NULL && group != NULL && !stop_issued)
                 {
@@ -191,17 +194,18 @@ void *Server::handleConnection(void* arg)
                     user->setLastSeen();
 
                     // Say message to the group
-                    user->say(received_packet->_payload, group->groupname);
+                    user->say(read_message->_message, group->groupname);
                 }
                 
                 break;
 
             case PAK_COMMAND:   // Command packet (login)
+
                 // Get user login information
-                login_payload_buffer = (login_payload*)received_packet->_payload;              
+                login_message = (message_record*)received_packet->_payload;              
 
                 // Try to join that group with this user
-                if (Group::joinByName(login_payload_buffer->username, login_payload_buffer->groupname, &user, &group, socket) != 0)
+                if (Group::joinByName(login_message->username, login_message->_message, &user, &group, socket) != 0)
                 {
                     // Update connected user and groupname
                     groupname = group->groupname;
@@ -238,16 +242,24 @@ void *Server::handleConnection(void* arg)
                 }
                 else
                 {
-                    // If user was not able to join group, refuse connection
-                    // TODO Send message in some type of standard struct
-                    sprintf(server_message, "%s %d", "Connection was refused due to exceding MAX_SESSIONS: ", MAX_SESSIONS);
-                    sendPacket(socket, PAK_COMMAND, server_message, sizeof(char)*strlen(server_message) + 1);
+                    // If user exceeds MAX_SESSIONS
+                    // Compose a message  of disconnection      
+                    message = "Connection was refused: exceeds MAX_SESSIONS (" + std::to_string(MAX_SESSIONS) + ")";
+                    
+                    // Compose message record
+                    read_message = CommunicationUtils::composeMessage(username,message, PAK_SERVER_MESSAGE);
+                    
+                    // Send message record to client
+                    sendPacket(socket, PAK_COMMAND, (char*)read_message, sizeof(*read_message) + read_message->length);
 
                     // Reject connection
                     close(socket);
 
                     // Free received argument pointer
                     free(arg);
+
+                    // Free composed message record
+                    free(read_message);
 
                     // Request write rights
                     threads_monitor.requestWrite();
@@ -283,7 +295,7 @@ void *Server::handleConnection(void* arg)
     if(errno == EAGAIN || errno == EWOULDBLOCK)
     {
         // If so, close the connection for good
-        // TODO Maybe inform client somehow?
+        // OBS: No point in sending message to client, application probably froze
         close(socket);
     }
 
