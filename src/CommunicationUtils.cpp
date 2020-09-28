@@ -38,16 +38,14 @@ message_record* CommunicationUtils::composeMessage(std::string sender_name, std:
     // Calculate total size of the message record struct
     int record_size = sizeof(message_record) + (message_content.length() + 1);
 
-    // TODO Save type
-
     // Create a record for the message
     message_record* msg = (message_record*)malloc(record_size); // Malloc memory
-    bzero((void*)msg, record_size);                                    // Initialize bytes to zero
+    bzero((void*)msg, record_size);                             // Initialize bytes to zero
     strcpy(msg->username,sender_name.c_str());                  // Copy sender name
     msg->timestamp = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()); // Current timestamp
-    msg->type = message_type;
+    msg->type = message_type;                                   // Update message type
     msg->length = message_content.length() + 1;                 // Update message length
-    strcpy((char*)msg->_message ,message_content.c_str());      // Copy message
+    strcpy((char*)msg->_message, message_content.c_str());      // Copy message
 
     //Return a pointer to it
     return msg;

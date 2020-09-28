@@ -238,16 +238,24 @@ void *Server::handleConnection(void* arg)
                 }
                 else
                 {
-                    // If user was not able to join group, refuse connection
-                    // TODO Send message in some type of standard struct
-                    sprintf(server_message, "%s %d", "Connection was refused due to exceding MAX_SESSIONS: ", MAX_SESSIONS);
-                    sendPacket(socket, PAK_COMMAND, server_message, sizeof(char)*strlen(server_message) + 1);
+                    // If user exceeds MAX_SESSIONS
+                    // Compose a message  of disconnection      
+                    message = "Connection was refused: exceeds MAX_SESSIONS (" + std::to_string(MAX_SESSIONS) + ")";
+                    
+                    // Compose message record
+                    read_message = CommunicationUtils::composeMessage(username,message, PAK_SERVER_MESSAGE);
+                    
+                    // Send message record to client
+                    sendPacket(socket, PAK_COMMAND, (char*)read_message, sizeof(*read_message) + read_message->length);
 
                     // Reject connection
                     close(socket);
 
                     // Free received argument pointer
                     free(arg);
+
+                    // Free composed message record
+                    free(read_message);
 
                     // Request write rights
                     threads_monitor.requestWrite();

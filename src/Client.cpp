@@ -23,7 +23,7 @@ Client::Client(std::string username, std::string groupname, std::string server_i
 
     // Validate port
     if (!std::regex_match(server_port, std::regex(PORT_REGEX)))
-        throw std::invalid_argument("Invalid port format");
+        throw std::invalid_argument("Invalid Port format");
 
     // Initialize values
     this->username = username;
@@ -154,7 +154,11 @@ void Client::getMessages()
 
             case PAK_COMMAND: // Command packet (disconnect)
 
-                ClientInterface::printMessage(received_packet->_payload);
+                // Decode payload into a message record
+                received_message = (message_record*)received_packet->_payload;
+
+                // Show message to user
+                ClientInterface::printMessage(received_message->_message);
 
                 // Stop the client application
                 stop_issued = true;
@@ -173,14 +177,17 @@ void Client::getMessages()
     // If server closes connection
     if (read_bytes == 0)
     {
-        std::cout << "\nConnection closed." << std::endl;
+        ClientInterface::printMessage("Connection closed by the server");
     }
 
     // Signal input handler to stop
     stop_issued = true;
 
-    // Wait for other threads to finish
+    // Wait for input handler thread to finish
     pthread_join(Client::input_handler_thread,NULL);
+
+    // Wake up the keep-alive thread from it's sleep
+    pthread_cancel(Client::keep_alive_thread);
     pthread_join(Client::keep_alive_thread, NULL);
 };
 
@@ -246,15 +253,17 @@ void *Client::keepAlive(void* arg)
         // Sleep for SLEEP_TIME seconds between attempting to send messages to the server
         sleep(SLEEP_TIME);
     
-        // Request write rights
-        socket_monitor.requestWrite();
-    
-        // Send message
-        CommunicationUtils::sendPacket(Client::server_socket, PAK_KEEP_ALIVE, &keep_alive, sizeof(keep_alive));
+        if (!stop_issued)
+        {
+            // Request write rights
+            socket_monitor.requestWrite();
+        
+            // Send message
+            CommunicationUtils::sendPacket(Client::server_socket, PAK_KEEP_ALIVE, &keep_alive, sizeof(keep_alive));
 
-        // Release write rights
-        socket_monitor.releaseWrite();
-
+            // Release write rights
+            socket_monitor.releaseWrite();
+        }
     }
 
     // Exit
