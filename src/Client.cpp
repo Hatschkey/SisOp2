@@ -51,7 +51,7 @@ Client::~Client()
 
 void Client::setupConnection()
 {
-    int payload_size; // Payload size for the first packet(login packet)
+    message_record* login_record; // Record for sending login packet
 
     // Create socket
     if ( (server_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0)
@@ -66,14 +66,14 @@ void Client::setupConnection()
     if (connect(server_socket, (struct sockaddr *)&server_address, sizeof(server_address)) < 0)
         throw std::runtime_error(appendErrorMessage("Error connecting to server"));
 
-    // Prepare login content payload
-    login_payload lp;
-    sprintf(lp.username, "%s", username.c_str());
-    sprintf(lp.groupname, "%s", groupname.c_str());
-    payload_size = sizeof(lp);
+    // Prepare message record with login information
+    login_record = CommunicationUtils::composeMessage(username, std::string(groupname), LOGIN_MESSAGE);
 
     // Sends the command packet to the server
-    CommunicationUtils::sendPacket(server_socket, PAK_COMMAND, (char*)&lp, payload_size); 
+    CommunicationUtils::sendPacket(server_socket, PAK_COMMAND, (char*)login_record, sizeof(*login_record) + login_record->length); 
+
+    // Free login record
+    free(login_record);
 
     // Start user input getter thread
     pthread_create(&input_handler_thread, NULL, handleUserInput, NULL);

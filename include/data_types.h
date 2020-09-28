@@ -16,14 +16,6 @@ typedef struct __packet
 
 } packet;
 
-// Payload for a client login packet
-typedef struct __login_payload
-{
-    char username[21];  // Client username
-    char groupname[21]; // Groupname
-
-} login_payload;
-
 // Struct for recording a chat message, for storage in the history file
 typedef struct __message_record
 {

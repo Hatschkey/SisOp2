@@ -14,13 +14,14 @@
 #define SLEEP_TIME   10      // Time (in seconds) the client application waits between keep alive packets
 
 // Packet types
-#define PAK_DATA 1          // Message packet
-#define PAK_COMMAND 2       // Command packet
-#define PAK_KEEP_ALIVE 3    // Keep-Alive packet
-#define PAK_SERVER_MESSAGE 4  // A exclusive package sent by server
+#define PAK_DATA           1 // Message packet
+#define PAK_COMMAND        2 // Command packet
+#define PAK_KEEP_ALIVE     3 // Keep-Alive packet
+#define PAK_SERVER_MESSAGE 4 // Server message packet
 
 // Message types
 #define SERVER_MESSAGE 1 // Indicates a message sent by server (login or logout message)
-#define USER_MESSAGE 2   // Indicates a message sent by a user
+#define USER_MESSAGE   2 // Indicates a message sent by a user
+#define LOGIN_MESSAGE  3 // Login message containing group the user wants to log into
 
 #endif
