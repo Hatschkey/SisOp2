@@ -193,7 +193,7 @@ void Client::getMessages()
 
 void *Client::handleUserInput(void* arg)
 {
-    int payload_size;
+    message_record* message;
     
     // Flush stdin so no empty message is sent
     fflush(stdin);
@@ -212,16 +212,20 @@ void *Client::handleUserInput(void* arg)
 
             if (strlen(user_message) > 0) 
  	        {
+                // Compose message
+                message = CommunicationUtils::composeMessage(username, std::string(user_message), USER_MESSAGE);
+
                 // Request write rights
                 socket_monitor.requestWrite();
 
-                // Prepare message payload
-                char* payload = user_message + '\0';
-                payload_size = strlen(payload) + 1;
-                CommunicationUtils::sendPacket(server_socket, PAK_DATA, payload, payload_size);
+                // Send message to server
+                CommunicationUtils::sendPacket(server_socket, PAK_DATA, (char*)message, sizeof(*message) + message->length);
 
                 // Release write rights
                 socket_monitor.releaseWrite();
+
+                // Free composed message
+                free(message);
             }
 
         }

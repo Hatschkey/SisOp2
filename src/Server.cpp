@@ -184,6 +184,9 @@ void *Server::handleConnection(void* arg)
         {
             case PAK_DATA:   // Data packet
 
+                // Decode received message into a message record
+                read_message = (message_record*)received_packet->_payload;
+
                 // If user and group still exist
                 if (user != NULL && group != NULL && !stop_issued)
                 {
@@ -191,7 +194,7 @@ void *Server::handleConnection(void* arg)
                     user->setLastSeen();
 
                     // Say message to the group
-                    user->say(received_packet->_payload, group->groupname);
+                    user->say(read_message->_message, group->groupname);
                 }
                 
                 break;
