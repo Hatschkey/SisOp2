@@ -53,4 +53,4 @@ run_server: ${BIN_DIR}server
 	cd ${BIN_DIR} && ./server 50
 
 run_client: ${BIN_DIR}client
-	cd ${BIN_DIR} && ./client user group 127.0.0.1 6789
+	cd ${BIN_DIR} && ./client user group localhost 6789

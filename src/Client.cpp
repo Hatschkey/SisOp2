@@ -28,7 +28,7 @@ Client::Client(std::string username, std::string groupname, std::string server_i
     // Initialize values
     this->username = username;
     this->groupname = groupname;
-    this->server_ip = server_ip;
+    this->server_ip = !server_ip.compare("localhost")? "127.0.0.1" : server_ip;
     this->server_port = stoi(server_port);
     this->server_socket = -1;
 
