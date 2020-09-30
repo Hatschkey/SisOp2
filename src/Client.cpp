@@ -194,46 +194,74 @@ void Client::getMessages()
 void *Client::handleUserInput(void* arg)
 {
     message_record* message;
-    
-    // Flush stdin so no empty message is sent
-    fflush(stdin);
+    char key; 
+    int i, enter = 0;
+
+    // Disable waiting for enter key to process input
+    nocbreak();
 
     // Get user messages to be sent until Ctrl D is pressed
     char user_message[MESSAGE_MAX + 1];
     do
     {
-        // Get user message
-        // TODO Detect Ctrl D press instead of Ctrl C
-        wgetstr(ClientInterface::inptscr, user_message);
-        try
+        // Get user message until Ctrl D pressed
+        for (i = 0, enter = 0 ; i < MESSAGE_MAX && !stop_issued && !enter; i++)
         {
-            // Reset input area below the screen
-            ClientInterface::resetInput();
+            // Get key pressed by the user
+            key = wgetch(ClientInterface::inptscr);
 
-            if (strlen(user_message) > 0) 
- 	        {
-                // Compose message
-                message = CommunicationUtils::composeMessage(username, std::string(user_message), USER_MESSAGE);
+            switch(key)
+            {
+                case 10:    // If enter was pressed
+                    enter = 1;
+                    break;
 
-                // Request write rights
-                socket_monitor.requestWrite();
+                case 4:     // If Ctrl D was pressed
+                    stop_issued = true;
+                    break;
 
-                // Send message to server
-                CommunicationUtils::sendPacket(server_socket, PAK_DATA, (char*)message, sizeof(*message) + message->length);
-
-                // Release write rights
-                socket_monitor.releaseWrite();
-
-                // Free composed message
-                free(message);
+                default:    // If it's a normal key only add to the message
+                    user_message[i] = key;
+                    break;
             }
-
         }
-        catch(const std::runtime_error& e)
+
+        // Add terminating null character to the end of the message
+        user_message[i] = '\0';
+
+        if (!stop_issued)
         {
-            std::cerr << e.what() << std::endl;
+            try
+            {
+                // Reset input area below the screen
+                ClientInterface::resetInput();
+
+                if (strlen(user_message) > 0) 
+                {
+                    // Compose message
+                    message = CommunicationUtils::composeMessage(username, std::string(user_message), USER_MESSAGE);
+
+                    // Request write rights
+                    socket_monitor.requestWrite();
+
+                    // Send message to server
+                    CommunicationUtils::sendPacket(server_socket, PAK_DATA, (char*)message, sizeof(*message) + message->length);
+
+                    // Release write rights
+                    socket_monitor.releaseWrite();
+
+                    // Free composed message
+                    free(message);
+                }
+
+            }
+            catch(const std::runtime_error& e)
+            {
+                std::cerr << e.what() << std::endl;
+            }
         }
 
+        bzero((void*)user_message, MESSAGE_MAX + 1);
     }
     while(!stop_issued);
 
