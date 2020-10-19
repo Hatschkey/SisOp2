@@ -234,7 +234,7 @@ int User::say(std::string message, std::string groupname)
 
     // "Posts" a message to group, along with sender username
     if (group != NULL)
-        return group->post(message, this->username);
+        return group->post(message, this->username, USER_MESSAGE);
 
     return 0;
 }

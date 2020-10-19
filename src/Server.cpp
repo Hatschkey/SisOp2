@@ -237,7 +237,7 @@ void *Server::handleConnection(void* arg)
                     if (!stop_issued && user->getSessionCount(groupname) == 1) 
                     {
                         message = "User [" + user->username + "] has joined.";
-                        group->broadcastMessage(message ,user->username);
+                        group->post(message ,user->username, SERVER_MESSAGE);
                     }
                 }
                 else
@@ -309,7 +309,7 @@ void *Server::handleConnection(void* arg)
         !stop_issued)
     {
         message = "User [" + username + "] has disconnected.";
-        group->broadcastMessage(message ,username);
+        group->post(message ,username, SERVER_MESSAGE);
     }
 
     // Release read rights

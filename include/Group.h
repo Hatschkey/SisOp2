@@ -108,9 +108,10 @@ class Group : protected CommunicationUtils
      * Saves the message and notifies all group members, including sender
      * @param message  Message that is being posted in the group
      * @param username Who sent this message
+     * @param message_type If this messag is sent from a user or from the server
      * @return Number of users this message was sent to, should always be at least 1 (the sender) on success
      */
-    int post(std::string message, std::string username);
+    int post(std::string message, std::string username, int message_type);
 
     /**
      * Creates and saves the given message to this groups history file.
@@ -129,16 +130,6 @@ class Group : protected CommunicationUtils
      * @return Number of recorded messages retrieved from the grupo.hist file
      */
     int recoverHistory(char* message_record_list, int n, User* user);
-
-    /**
-     * Brodcast a chat message to connected clients as the server
-     * Saves the message and notifies all group members, including sender
-     * @param message  Message that is being broadcasted to the clients   
-     * @param username Username name for the client logging in or out
-     * @return Number indicanting success or failure(0 or 1)
-     */
-    int broadcastMessage(std::string message, std::string username);
-
 };
 
 #endif

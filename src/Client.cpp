@@ -194,41 +194,13 @@ void Client::getMessages()
 void *Client::handleUserInput(void* arg)
 {
     message_record* message;
-    char key; 
-    int i, enter = 0;
-
-    // Disable waiting for enter key to process input
-    nocbreak();
 
     // Get user messages to be sent until Ctrl D is pressed
     char user_message[MESSAGE_MAX + 1];
     do
     {
-        // Get user message until Ctrl D pressed
-        for (i = 0, enter = 0 ; i < MESSAGE_MAX && !stop_issued && !enter; i++)
-        {
-            // Get key pressed by the user
-            key = wgetch(ClientInterface::inptscr);
-
-            switch(key)
-            {
-                case 10:    // If enter was pressed
-                    enter = 1;
-                    break;
-
-                case 4:     // If Ctrl D was pressed
-                    stop_issued = true;
-                    break;
-
-                default:    // If it's a normal key only add to the message
-                    user_message[i] = key;
-                    break;
-            }
-        }
-
-        // Add terminating null character to the end of the message
-        user_message[i] = '\0';
-
+        if (wgetnstr(ClientInterface::inptscr,user_message, MESSAGE_MAX) == ERR)
+            stop_issued = true;
         if (!stop_issued)
         {
             try
