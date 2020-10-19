@@ -12,7 +12,7 @@ Session::Session(std::string username, std::string groupname, int socket)
     this->group = NULL;
 
     // Attempt to join that group with that user
-    if (!Group::joinByName(username, groupname, &this->user, &this->group, socket))
+    if (!Group::joinByName(username, groupname, &this->user, &this->group, this))
     {
         // Compose disconnect message
         message = "Connection was refused: exceeds MAX_SESSIONS (" + std::to_string(MAX_SESSIONS) + ")";
@@ -28,7 +28,7 @@ Session::Session(std::string username, std::string groupname, int socket)
 Session::~Session()
 {
     // Leave the group with the user
-    this->user->leaveGroup(this->group, socket);
+    this->user->leaveGroup(this);
 
     // Close the socket
     close(this->socket);
@@ -37,6 +37,21 @@ Session::~Session()
 bool Session::isOpen()
 {
     return this->user != NULL ? true : false;
+}
+
+int Session::getId()
+{
+    return this->socket;
+}
+
+Group *Session::getGroup()
+{
+    return this->group;
+}
+
+User *Session::getUser()
+{
+    return this->user;
 }
 
 int Session::sendHistory(int N)
@@ -78,11 +93,16 @@ void Session::messageGroup(message_record *message)
     // Update user's last seen variable
     this->user->setLastSeen();
 
-    // Say message to the group
-    this->user->say(message->_message, this->group->groupname);
+    // Send message to the group
+    if (this->group != NULL)
+        this->group->post(message->_message, this->user->username, USER_MESSAGE);
 }
 
-void Session::messageClient(message_record *message)
+void Session::messageClient(message_record *message, int packet_type)
 {
-    // TODO
+    // Calculate message size
+    int size = sizeof(*message) + message->length;
+
+    // Send
+    CommunicationUtils::sendPacket(this->socket, packet_type, (char *)message, size);
 }

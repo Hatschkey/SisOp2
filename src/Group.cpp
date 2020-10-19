@@ -119,7 +119,7 @@ void Group::listGroups()
     Group::active_groups_monitor.releaseRead();
 }
 
-int Group::joinByName(std::string username, std::string groupname, User **user, Group **group, int socket_id)
+int Group::joinByName(std::string username, std::string groupname, User **user, Group **group, Session *session)
 {
     int status = 0; // Status indicating if the user was able to join the group
 
@@ -132,7 +132,7 @@ int Group::joinByName(std::string username, std::string groupname, User **user, 
     *group = Group::getGroup(groupname);
 
     // Try to join the group with that user
-    status = (*user)->joinGroup(*group, socket_id);
+    status = (*user)->joinGroup(*group, session);
 
     // Release read rights
     Group::active_groups_monitor.releaseWrite();

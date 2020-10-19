@@ -165,7 +165,6 @@ void *Server::handleConnection(void *arg)
 
     message_record *read_message;
 
-
     Session *current_session = NULL; // Current session instance for a client
 
     while ((read_bytes = recv(socket, client_message, PACKET_MAX, 0)) > 0)
@@ -198,17 +197,8 @@ void *Server::handleConnection(void *arg)
             // If session creation went ok
             if (current_session->isOpen())
             {
-
                 // Send history to client
                 current_session->sendHistory(Server::message_history);
-
-                /*
-                if (!stop_issued && user->getSessionCount(groupname) == 1) // TODO remake this
-                {
-                    message = "User [" + user->username + "] has joined.";
-                    group->post(message, user->username, SERVER_MESSAGE);
-                }
-                */
             }
             else
             {

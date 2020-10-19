@@ -5,6 +5,10 @@
 #include "Group.h"
 #include "CommunicationUtils.h"
 
+// Forward declare User and Group
+class User;
+class Group;
+
 class Session : protected CommunicationUtils
 {
 private:
@@ -26,11 +30,28 @@ public:
      */
     ~Session();
 
+    // GETTERS
+
+    /**
+     * @brief Returns the session id, represented by the socket descriptor 
+     */
+    int getId();
+
     /**
      * @brief Checks if session was created ok
      * @returns True if session opened ok, false otherwise 
      */
     bool isOpen();
+
+    /**
+     * @brief Returns group for this session 
+     */
+    Group *getGroup();
+
+    /**
+     * @brief Retrurns user for this session 
+     */
+    User *getUser();
 
     // SESSION LOGIC METHODS
 
@@ -49,9 +70,10 @@ public:
 
     /**
      * @brief Sends a message form the group to the client 
-     * @param message The message being sent
+     * @param message     The message being sent
+     * @param packet_type The type of packet being sent
      */
-    void messageClient(message_record *message);
+    void messageClient(message_record *message, int packet_type);
 };
 
 #endif
