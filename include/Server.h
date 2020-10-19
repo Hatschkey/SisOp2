@@ -17,6 +17,7 @@
 #include "constants.h"
 #include "RW_Monitor.h"
 #include "CommunicationUtils.h"
+#include "Session.h"
 
 class Server : protected CommunicationUtils
 {
