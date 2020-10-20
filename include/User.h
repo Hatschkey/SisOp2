@@ -9,25 +9,25 @@
 #include "constants.h"
 #include "data_types.h"
 #include "Group.h"
+#include "Session.h"
 #include "RW_Monitor.h"
 #include "CommunicationUtils.h"
 
-// Forward declare Group
+// Forward declare Group and session
 class Group;
+class Session;
 
 class User : protected CommunicationUtils
 {
-    public:
-    static std::map<std::string, User*> active_users;   // Current active users
-    static RW_Monitor active_users_monitor; // Monitor for active users
+public:
+    static std::map<std::string, User *> active_users; // Current active users
+    static RW_Monitor active_users_monitor;            // Monitor for active users
 
     std::string username; // User display name
-    uint64_t last_seen; // Last time a message was received from this user
-    std::map<std::string, int> joined_groups; // Groups this user instance has joined and how many sessions are active in each group
-    RW_Monitor joined_groups_monitor;   // Monitor for joined groups
-    
-    std::map<int, std::string> group_sockets; // Map for group and sockets related to that group (Max MAX_SESSIONS)
-    RW_Monitor group_sockets_monitor;  // Monitor for group to socket id map
+    uint64_t last_seen;   // Last time a message was received from this user
+
+    std::map<int, Session *> sessions; // User active sessions
+    RW_Monitor session_monitor;        // Monitor for active session list
 
     /**
      * Searches for the given username in the currently active users list.
@@ -35,14 +35,14 @@ class User : protected CommunicationUtils
      * @param username Username of the user to search for
      * @return Reference to the user structure in the user list
      */
-    static User* getUser(std::string username);
+    static User *getUser(std::string username);
 
     /**
      * Add user to currently active user list
      * TODO This method also should be read-write protected, only one user may be added at a time
      * @param user Pointer to user that will be added to list
      */
-    static void addUser(User* user);
+    static void addUser(User *user);
 
     /**
      * Remove specified user
@@ -77,28 +77,18 @@ class User : protected CommunicationUtils
 
     /**
      * Tries to join the given group, if the session count allows for it
-     * @param group Instance of a Group class
-     * @param socket_id Identifier for the socket corresponding to the session thread
+     * @param group   Instance of a Group class
+     * @param session Instance of the session for this connection
      * @return 1 if join was successful, 0 if it wasn't
      */
-    int joinGroup(Group* group, int socket_id);
+    int joinGroup(Group *group, Session *session);
 
     /**
      * Tries to leave the given group
-     * @param group Instance of the group the user wishes to leave
-     * @param socket_id Identifier for the socket corresponding to the finishing thread
+     * @param session Instace of the session for the connection being closed
      * @returns 1 if that was the last user in the group, 0 otherwise
      */
-    int leaveGroup(Group* group, int socket_id);
-
-    /**
-     * Sends a message said by this user to the group
-     * @param message   Chat message this user wants to say
-     * @param groupname Name of the group this message is being sent to
-     * @return Number of users this message was sent to, should always be at least 1 (the sender) on success
-     */
-    int say(std::string message, std::string groupname);
-
+    int leaveGroup(Session *session);
 
     /**
      * Signals the user instance that a new message has arrived to the group

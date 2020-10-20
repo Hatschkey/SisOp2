@@ -11,22 +11,23 @@
 #include "User.h"
 #include "RW_Monitor.h"
 #include "CommunicationUtils.h"
+#include "Session.h"
 
-
-// Forward declare User
+// Forward declare User and Session
 class User;
+class Session;
 
 class Group : protected CommunicationUtils
 {
-    public:
-    static std::map<std::string, Group*> active_groups;  // Current active groups
+public:
+    static std::map<std::string, Group *> active_groups; // Current active groups
     static RW_Monitor active_groups_monitor;             // Monitor for the group list variable
 
-    std::string groupname;                  // Name for this group instance
-    std::map<std::string, User*> users;     // Map of references to users connected to this group
-    RW_Monitor users_monitor;               // Monitor for this instance's user list
-    FILE* history_file;                     // File descriptor for this group's history file
-    RW_Monitor history_file_monitor;        // Monitor for acessing the group history file
+    std::string groupname;               // Name for this group instance
+    std::map<std::string, User *> users; // Map of references to users connected to this group
+    RW_Monitor users_monitor;            // Monitor for this instance's user list
+    FILE *history_file;                  // File descriptor for this group's history file
+    RW_Monitor history_file_monitor;     // Monitor for acessing the group history file
 
     // These static methods are related to the list of all groups (static active_groups)
     /**
@@ -34,13 +35,13 @@ class Group : protected CommunicationUtils
      * @param groupname Name of the group to search for
      * @return Reference to the group structure in the group list
      */
-    static Group* getGroup(std::string groupname);
+    static Group *getGroup(std::string groupname);
 
     /**
      * Add group to currently active group list
      * @param group Pointer to the group that will be added to the list
      */
-    static void addGroup(Group* group);
+    static void addGroup(Group *group);
 
     /**
      * Remove specified group
@@ -61,10 +62,10 @@ class Group : protected CommunicationUtils
      * @param groupname Name of the group
      * @param user      Pointer to the pointer that will be filled when getting the user
      * @param group     Pointer to the pointer that will be filled when getting the group
-     * @param socket_id Socket where the connection is comming from
+     * @param session   Session instance for this connection
      * @returns  1 if join was sucessful, 0 otherwise
      */
-    static int joinByName(std::string username, std::string groupname, User** user, Group** group, int socket_id);
+    static int joinByName(std::string username, std::string groupname, User **user, Group **group, Session *session);
 
     // These non-static methods are related to an instance of group
 
@@ -83,7 +84,7 @@ class Group : protected CommunicationUtils
      * Add given user to group
      * @param user User to be added to this group
      */
-    void addUser(User* user);
+    void addUser(User *user);
 
     /**
      * Remove the user corresponding to the given username
@@ -108,9 +109,10 @@ class Group : protected CommunicationUtils
      * Saves the message and notifies all group members, including sender
      * @param message  Message that is being posted in the group
      * @param username Who sent this message
+     * @param message_type If this messag is sent from a user or from the server
      * @return Number of users this message was sent to, should always be at least 1 (the sender) on success
      */
-    int post(std::string message, std::string username);
+    int post(std::string message, std::string username, int message_type);
 
     /**
      * Creates and saves the given message to this groups history file.
@@ -128,17 +130,7 @@ class Group : protected CommunicationUtils
      * @param user Pointer to the user instance that will receive these messages
      * @return Number of recorded messages retrieved from the grupo.hist file
      */
-    int recoverHistory(char* message_record_list, int n, User* user);
-
-    /**
-     * Brodcast a chat message to connected clients as the server
-     * Saves the message and notifies all group members, including sender
-     * @param message  Message that is being broadcasted to the clients   
-     * @param username Username name for the client logging in or out
-     * @return Number indicanting success or failure(0 or 1)
-     */
-    int broadcastMessage(std::string message, std::string username);
-
+    int recoverHistory(char *message_record_list, int n, User *user);
 };
 
 #endif

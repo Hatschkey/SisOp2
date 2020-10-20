@@ -24,25 +24,25 @@
 class Client : protected CommunicationUtils
 {
     // Private attributes
-    private:
+private:
+    static std::atomic<bool> stop_issued; // Atomic flag for stopping all threads
+    static std::string username;          // Client display name
+    std::string groupname;                // Group the client wishes to join
+    std::string server_ip;                // IP of the remote server
+    int server_port;                      // Port the remote server listens at
+    static int server_socket;             // Socket for remote server communication
+    struct sockaddr_in server_address;    // Server socket address
 
-    static std::atomic<bool> stop_issued;   // Atomic flag for stopping all threads
-    static std::string username;            // Client display name
-    std::string groupname;                  // Group the client wishes to join
-    std::string server_ip;                  // IP of the remote server
-    int         server_port;                // Port the remote server listens at
-    static int  server_socket;              // Socket for remote server communication
-    struct sockaddr_in server_address;      // Server socket address
+    static pthread_t input_handler_thread; // Thread to listen for new incoming server messages
+    static pthread_t keep_alive_thread;    // Thread to keep the client "alive" by sending periodic messages to server
+    static pthread_t ui_update_thread;     // Thread to keep UI timer and info up-to-date
 
-    static pthread_t input_handler_thread;  // Thread to listen for new incoming server messages
-    static pthread_t keep_alive_thread;     // Thread to keep the client "alive" by sending periodic messages to server
-
-    static RW_Monitor socket_monitor;       // Monitor that controls the sending of data through the socket
+    static RW_Monitor socket_monitor; // Monitor that controls the sending of data through the socket
 
     // Public methods
-    public:
+public:
     /**
-     * Class constructor
+     * @brief Class constructor
      * @param username User display name, must be between 4-20 characters (inclusive) and be composed of only letters, numbers and dots(.)
      * @param groupname Chat room the user wishes to join, must be between 4-20 characters (inclusive) and be composed of only letters, numbers and dots(.)
      * @param server_ip IP Address for the remote server, formatted in IPv4 (x.x.x.x)
@@ -66,18 +66,17 @@ class Client : protected CommunicationUtils
      */
     void getMessages();
 
-    private:
-
+private:
     /**
      * Handles getting user input so that it may be sent to the remtoe server
      * This should run in a separate thread to getMessages
      */
-    static void *handleUserInput(void* arg);
+    static void *handleUserInput(void *arg);
 
     /**
      * Loops sending messages to server in order to keep the connection "alive"
      */
-    static void *keepAlive(void* arg);
+    static void *keepAlive(void *arg);
 };
 
 #endif

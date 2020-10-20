@@ -1,11 +1,11 @@
 #include "User.h"
 
-std::map<std::string, User*> User::active_users;
+std::map<std::string, User *> User::active_users;
 RW_Monitor User::active_users_monitor;
 
-User* User::getUser(std::string username)
+User *User::getUser(std::string username)
 {
-    User* user; // Reference to the user
+    User *user; // Reference to the user
     int exists = 0;
 
     try
@@ -15,19 +15,19 @@ User* User::getUser(std::string username)
 
         exists = 1;
     }
-    catch(const std::out_of_range& e)
+    catch (const std::out_of_range &e)
     {
         // If reached end of map, user is not there
         exists = 0;
     }
 
-    return exists? user : new User(username);
+    return exists ? user : new User(username);
 };
 
-void User::addUser(User* user)
+void User::addUser(User *user)
 {
     // Insert user in map
-    active_users.insert(std::make_pair(user->username,user));
+    active_users.insert(std::make_pair(user->username, user));
 }
 
 int User::removeUser(std::string username)
@@ -48,14 +48,15 @@ void User::listUsers()
     active_users_monitor.requestRead();
 
     // Delimiter
-    std::cout << "======================\n" << std::endl;
+    std::cout << "======================\n"
+              << std::endl;
 
     // Iterate map listing users
-    for (std::map<std::string,User*>::iterator i = active_users.begin(); i != active_users.end(); ++i)
+    for (std::map<std::string, User *>::iterator i = active_users.begin(); i != active_users.end(); ++i)
     {
         std::cout << "Username: " << i->second->username << std::endl;
         std::cout << "Active sessions: " << i->second->getSessionCount() << std::endl;
-        std::cout << "Last seen: " << std::ctime((time_t*)&(i->second->last_seen)) << std::endl;
+        std::cout << "Last seen: " << std::ctime((time_t *)&(i->second->last_seen)) << std::endl;
     }
 
     // Delimiter
@@ -80,161 +81,110 @@ int User::getSessionCount()
     int total_sessions = 0; // Total sessions the user has at the moment
 
     // Request read rights
-    joined_groups_monitor.requestRead();
+    session_monitor.requestRead();
 
     // Iterate map summing all user sessions
-    for (std::map<std::string,int>::iterator i = this->joined_groups.begin(); i != this->joined_groups.end(); ++i)
+    for (auto i = this->sessions.begin(); i != this->sessions.end(); ++i)
     {
-        total_sessions += i->second;
+        total_sessions++;
     }
 
     // Release read rights
-    joined_groups_monitor.releaseRead();
+    session_monitor.releaseRead();
 
     return total_sessions;
 }
 
 int User::getSessionCount(std::string groupname)
 {
-    int group_sessions; // Number of sessions in that group
+    int count = 0;
 
-    // Request read rights
-    joined_groups_monitor.requestRead();
+    this->session_monitor.requestRead();
 
-    try
+    // Iterate sessions
+    for (auto i = this->sessions.begin(); i != this->sessions.end(); ++i)
     {
-        // Get sessions in that group
-        group_sessions = this->joined_groups.at(groupname);
-    }
-    catch(const std::out_of_range& e)
-    {
-        // If user is not connected to that group return 0    
-        group_sessions = 0;
+        if (!i->second->getGroup()->groupname.compare(groupname))
+        {
+            count++;
+        }
     }
 
-    // Release read rights
-    joined_groups_monitor.releaseRead();
+    this->session_monitor.releaseRead();
 
-    // Return session count
-    return group_sessions;
+    return count;
 }
 
-int User::joinGroup(Group* group, int socket_id)
+int User::joinGroup(Group *group, Session *session)
 {
+    // Login message
+    std::string message;
+
     // Check for user session count
     if (this->getSessionCount() < MAX_SESSIONS)
     {
-        // Add user to group
-        group->addUser(this);
-
-        // Request write rights
-        joined_groups_monitor.requestWrite();
 
         // Check if this user is already connected to this group
-        if (this->joined_groups.find(group->groupname) == this->joined_groups.end())
+        if (this->getSessionCount(group->groupname) == 0)
         {
-            // If not, add it with 1 session
-            this->joined_groups.insert(std::make_pair(group->groupname, 1));
-        }
-        else
-        {
-            // If it is, increase session count
-            this->joined_groups.at(group->groupname)++;
-        }
+            // Add user to group
+            group->addUser(this);
 
-        // Release write rights
-        joined_groups_monitor.releaseWrite();
+            // Send a login message
+            message = "User [" + this->username + "] has joined.";
+            group->post(message, this->username, SERVER_MESSAGE);
+        }
 
         // Request write rights
-        group_sockets_monitor.requestWrite();
+        this->session_monitor.requestWrite();
 
-        // Add socket descriptor to corresponding thread id list
-        group_sockets.insert(std::make_pair(socket_id,group->groupname));
+        // Add to list
+        this->sessions.insert(std::make_pair(session->getId(), session));
 
         // Release write rights
-        group_sockets_monitor.releaseWrite();
+        this->session_monitor.releaseWrite();
 
         // Return sucessful join
         return 1;
     }
 
-    // If user has 2 active sessions, refuse to join group
+    // If user has 2 active sessions, refuse connection
     return 0;
 }
 
-int User::leaveGroup(Group* group, int socket_id)
+int User::leaveGroup(Session *session)
 {
     // Request write rights
-    joined_groups_monitor.requestWrite();
+    this->session_monitor.requestWrite();
 
-    // Remove the group from this user's group list
-    this->joined_groups.at(group->groupname)--;
-
-    // Request write rights
-    group_sockets_monitor.requestWrite();
-
-    // Remove session thread from vector
-    group_sockets.erase(socket_id);
+    // Remove the session from the user list
+    this->sessions.erase(session->getId());
 
     // Release write rights
-    group_sockets_monitor.releaseWrite();
-    
-    // Check if any sessions are left in that group
-    if (this->joined_groups.at(group->groupname) == 0)
+    this->session_monitor.releaseWrite();
+
+    // Check if this was the last user session from the leaving group
+    if (this->getSessionCount(session->getGroup()->groupname) == 0)
     {
-        // If not, remove the group from the joined groups map
-        this->joined_groups.erase(group->groupname);
+        // Send a disconnect message
+        std::string message = "User [" + username + "] has disconnected.";
+        session->getGroup()->post(message, username, SERVER_MESSAGE);
 
         // Leave the group
-        group->removeUser(this->username);
+        session->getGroup()->removeUser(this->username);
 
-        // Check if this was the last session for the user
-        if (this->joined_groups.empty())
+        // Check if this is the last user session at all
+        if (this->getSessionCount() == 0)
         {
-            // Request write rights
-            active_users_monitor.requestWrite();
-
-            // Remove user from static user list
+            // If so, remove itself from active users list
+            User::active_users_monitor.requestWrite();
             User::active_users.erase(this->username);
-
-            // Release write rights
-            active_users_monitor.releaseWrite();
-            joined_groups_monitor.releaseWrite();
+            User::active_users_monitor.releaseWrite();
 
             // And delete itself
-            delete(this);
-
+            delete this;
         }
-        else
-        {
-            // Release write rights
-            joined_groups_monitor.releaseWrite();
-        }
-
     }
-    else
-    {
-        // Release write rights
-        joined_groups_monitor.releaseWrite();
-    }
-
-    return 0;
-}
-
-int User::say(std::string message, std::string groupname)
-{
-    // Request read rights
-    Group::active_groups_monitor.requestRead();
-
-    // Fetch the group
-    Group* group = Group::getGroup(groupname);
-
-    // Release read rights
-    Group::active_groups_monitor.releaseRead();
-
-    // "Posts" a message to group, along with sender username
-    if (group != NULL)
-        return group->post(message, this->username);
 
     return 0;
 }
@@ -244,24 +194,21 @@ int User::signalNewMessage(std::string message, std::string username, std::strin
     int message_record_size = 0; // Size of the composed message (in bytes)
 
     // Compose a new message
-    message_record* msg = CommunicationUtils::composeMessage(username, message, message_type);
-
-    // Calculate message size
-    message_record_size = sizeof(*msg) + msg->length;
+    message_record *msg = CommunicationUtils::composeMessage(username, message, message_type);
 
     // Request read rights
-    group_sockets_monitor.requestRead();
+    session_monitor.requestRead();
 
-    // Iterate through connected client sockets
-    for (std::map<int, std::string>::iterator i = group_sockets.begin(); i != group_sockets.end(); ++i)
+    // Iterate through sessions
+    for (auto i = sessions.begin(); i != sessions.end(); ++i)
     {
         // If client is part of this group, send message
-        if (groupname.compare(i->second) == 0)
-            CommunicationUtils::sendPacket(i->first, packet_type, (char*)msg, message_record_size);
+        if (!i->second->getGroup()->groupname.compare(groupname))
+            i->second->messageClient(msg, packet_type);
     }
 
     // Release read rights
-    group_sockets_monitor.releaseRead();
+    session_monitor.releaseRead();
 
     // Free created structure
     free(msg);
