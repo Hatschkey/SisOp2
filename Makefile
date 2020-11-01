@@ -1,59 +1,68 @@
 CC = g++
 
-SRC_DIR := src/
-OBJ_DIR := obj/
-BIN_DIR := bin/
-INC_DIR := include/
-HIST_DIR := bin/hist/
+SRC := src/
+OBJ := obj/
+BIN := bin/
+INC := include/
+HIST := bin/hist/
 
-all: dirs ${BIN_DIR}client ${BIN_DIR}server
+all: dirs client server replica
 
-${BIN_DIR}server: ${OBJ_DIR}RW_Monitor.o ${OBJ_DIR}Session.o ${OBJ_DIR}User.o ${OBJ_DIR}Group.o ${OBJ_DIR}serverApp.o ${OBJ_DIR}CommunicationUtils.o
-	${CC} ${OBJ_DIR}serverApp.o ${OBJ_DIR}Server.o ${OBJ_DIR}RW_Monitor.o ${OBJ_DIR}Session.o ${OBJ_DIR}User.o ${OBJ_DIR}Group.o ${OBJ_DIR}CommunicationUtils.o -o ${BIN_DIR}server -lpthread -Wall
+replica: RW_Monitor Session User Group replicaApp CommunicationUtils
+	${CC} ${OBJ}replicaApp.o ${OBJ}ReplicaManager.o ${OBJ}RW_Monitor.o ${OBJ}Session.o ${OBJ}User.o ${OBJ}Group.o ${OBJ}CommunicationUtils.o -o ${BIN}replica -lpthread -Wall
 
-${BIN_DIR}client: ${OBJ_DIR}ClientInterface.o ${OBJ_DIR}clientApp.o ${OBJ_DIR}CommunicationUtils.o ${OBJ_DIR}RW_Monitor.o
-	${CC} ${OBJ_DIR}ClientInterface.o ${OBJ_DIR}clientApp.o ${OBJ_DIR}Client.o ${OBJ_DIR}CommunicationUtils.o ${OBJ_DIR}RW_Monitor.o -o ${BIN_DIR}client -lncurses -lpthread -Wall
+server: RW_Monitor Session User Group CommunicationUtils serverApp
+	${CC} ${OBJ}serverApp.o ${OBJ}Server.o ${OBJ}RW_Monitor.o ${OBJ}Session.o ${OBJ}User.o ${OBJ}Group.o ${OBJ}CommunicationUtils.o -o ${BIN}server -lpthread -Wall
+
+client: ClientInterface CommunicationUtils RW_Monitor Client clientApp
+	${CC} ${OBJ}ClientInterface.o ${OBJ}clientApp.o ${OBJ}Client.o ${OBJ}CommunicationUtils.o ${OBJ}RW_Monitor.o -o ${BIN}client -lncurses -lpthread -Wall
 	
-${OBJ_DIR}serverApp.o: ${OBJ_DIR}Server.o ${SRC_DIR}serverApp.cpp ${INC_DIR}data_types.h ${INC_DIR}constants.h
-	${CC} -c ${SRC_DIR}serverApp.cpp -I ${INC_DIR} -o ${OBJ_DIR}serverApp.o -Wall
+replicaApp: ReplicaManager
+	${CC} -c ${SRC}replicaApp.cpp -I ${INC} -o ${OBJ}replicaApp.o -Wall
+
+serverApp: Server
+	${CC} -c ${SRC}serverApp.cpp -I ${INC} -o ${OBJ}serverApp.o -Wall
 	
-${OBJ_DIR}clientApp.o: ${OBJ_DIR}Client.o ${SRC_DIR}clientApp.cpp ${INC_DIR}data_types.h ${INC_DIR}constants.h
-	${CC} -c ${SRC_DIR}clientApp.cpp -I ${INC_DIR} -o ${OBJ_DIR}clientApp.o -Wall
+clientApp: Client
+	${CC} -c ${SRC}clientApp.cpp -I ${INC} -o ${OBJ}clientApp.o -Wall
 
-${OBJ_DIR}Server.o: ${SRC_DIR}Server.cpp ${INC_DIR}Server.h ${INC_DIR}data_types.h ${INC_DIR}constants.h
-	${CC} -c ${SRC_DIR}Server.cpp -I ${INC_DIR} -o ${OBJ_DIR}Server.o -Wall
+Server:
+	${CC} -c ${SRC}Server.cpp -I ${INC} -o ${OBJ}Server.o -Wall
 
-${OBJ_DIR}Client.o: ${SRC_DIR}Client.cpp ${INC_DIR}Client.h ${INC_DIR}data_types.h ${INC_DIR}constants.h
-	${CC} -c ${SRC_DIR}Client.cpp -I ${INC_DIR} -o ${OBJ_DIR}Client.o -Wall
+Client:
+	${CC} -c ${SRC}Client.cpp -I ${INC} -o ${OBJ}Client.o -Wall
 
-${OBJ_DIR}Group.o:
-	${CC} -c ${SRC_DIR}Group.cpp -I ${INC_DIR} -o ${OBJ_DIR}Group.o -Wall
+Group:
+	${CC} -c ${SRC}Group.cpp -I ${INC} -o ${OBJ}Group.o -Wall
 
-${OBJ_DIR}User.o:
-	${CC} -c ${SRC_DIR}User.cpp -I ${INC_DIR} -o ${OBJ_DIR}User.o -Wall
+User:
+	${CC} -c ${SRC}User.cpp -I ${INC} -o ${OBJ}User.o -Wall
 
-${OBJ_DIR}Session.o:
-	${CC} -c ${SRC_DIR}Session.cpp -I ${INC_DIR} -o ${OBJ_DIR}Session.o -Wall
+Session:
+	${CC} -c ${SRC}Session.cpp -I ${INC} -o ${OBJ}Session.o -Wall
 
-${OBJ_DIR}RW_Monitor.o:
-	${CC} -c ${SRC_DIR}RW_Monitor.cpp -I ${INC_DIR} -o ${OBJ_DIR}RW_Monitor.o -Wall
+RW_Monitor:
+	${CC} -c ${SRC}RW_Monitor.cpp -I ${INC} -o ${OBJ}RW_Monitor.o -Wall
 
-${OBJ_DIR}ClientInterface.o: ${SRC_DIR}ClientInterface.cpp ${INC_DIR}ClientInterface.h
-	${CC} -c ${SRC_DIR}ClientInterface.cpp -I ${INC_DIR} -o ${OBJ_DIR}ClientInterface.o -Wall
+ClientInterface:
+	${CC} -c ${SRC}ClientInterface.cpp -I ${INC} -o ${OBJ}ClientInterface.o -Wall
 
-${OBJ_DIR}CommunicationUtils.o: ${SRC_DIR}CommunicationUtils.cpp ${INC_DIR}CommunicationUtils.h
-	${CC} -c ${SRC_DIR}CommunicationUtils.cpp -I ${INC_DIR} -o ${OBJ_DIR}CommunicationUtils.o -Wall
+CommunicationUtils:
+	${CC} -c ${SRC}CommunicationUtils.cpp -I ${INC} -o ${OBJ}CommunicationUtils.o -Wall
+
+ReplicaManager:
+	${CC} -c ${SRC}ReplicaManager.cpp -I ${INC} -o ${OBJ}ReplicaManager.o -Wall
 
 dirs:
-	mkdir -p ${OBJ_DIR}
-	mkdir -p ${BIN_DIR}
-	mkdir -p ${HIST_DIR}
+	mkdir -p ${OBJ}
+	mkdir -p ${BIN}
+	mkdir -p ${HIST}
 
 clean:	
-	rm ${OBJ_DIR}*.o ${BIN_DIR}server ${BIN_DIR}client ${HIST_DIR}*.hist
+	rm ${OBJ}*.o ${BIN}server ${BIN}client ${BIN}replica ${HIST}*.hist
 
-run_server: ${BIN_DIR}server
-	cd ${BIN_DIR} && ./server 50
+run_server: ${BIN}server
+	cd ${BIN} && ./server 50
 
-run_client: ${BIN_DIR}client
-	cd ${BIN_DIR} && ./client user group localhost 6789
+run_client: ${BIN}client
+	cd ${BIN} && ./client user group localhost 6789
