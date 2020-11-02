@@ -6,11 +6,12 @@ int Client::server_socket;
 pthread_t Client::input_handler_thread;
 pthread_t Client::keep_alive_thread;
 pthread_t Client::ui_update_thread;
+pthread_t Client::election_listener_thread;
 
 std::string Client::username;
 RW_Monitor Client::socket_monitor;
 
-Client::Client(std::string username, std::string groupname, std::string server_ip, std::string server_port)
+Client::Client(std::string username, std::string groupname, std::string server_ip, std::string server_port, std::string listen_port)
 {
     // Validate username
     if (!std::regex_match(username, std::regex(NAME_REGEX)))
@@ -24,9 +25,13 @@ Client::Client(std::string username, std::string groupname, std::string server_i
     if (!std::regex_match(server_ip, std::regex(IP_REGEX)))
         throw std::invalid_argument("Invalid IP format");
 
-    // Validate port
+    // Validate server port
     if (!std::regex_match(server_port, std::regex(PORT_REGEX)))
-        throw std::invalid_argument("Invalid Port format");
+        throw std::invalid_argument("Invalid Server Port format");
+
+    // Validate listen port
+    if (!std::regex_match(listen_port, std::regex(PORT_REGEX)))
+        throw std::invalid_argument("Invalid Listen Port format");
 
     // Initialize values
     this->username = username;
@@ -34,6 +39,10 @@ Client::Client(std::string username, std::string groupname, std::string server_i
     this->server_ip = !server_ip.compare("localhost") ? "127.0.0.1" : server_ip;
     this->server_port = stoi(server_port);
     this->server_socket = -1;
+
+    // Start election listener
+    int lport = stoi(listen_port);
+    pthread_create(&election_listener_thread, NULL, startElectionListener, reinterpret_cast<void *>(lport));
 
     // Set atomic flag as false
     stop_issued = false;
@@ -46,6 +55,9 @@ Client::~Client()
 {
     // Finalize client interface
     ClientInterface::destroy();
+
+    // Close election listener
+    pthread_join(Client::input_handler_thread, NULL);
 
     // Close server socket if it is still open
     if (server_socket > 0)
@@ -253,6 +265,15 @@ void *Client::handleUserInput(void *arg)
     // End with no return value
     pthread_exit(NULL);
 };
+
+void *Client::startElectionListener(void *arg)
+{
+    int port = reinterpret_cast<long>(arg);
+    ElectionListener *listener = new ElectionListener(port);
+    listener->listenConnections();
+    delete listener;
+    pthread_exit(NULL);
+}
 
 void *Client::keepAlive(void *arg)
 {

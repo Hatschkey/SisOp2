@@ -20,6 +20,7 @@
 #include "RW_Monitor.h"
 
 #include "ClientInterface.h"
+#include "ElectionListener.h"
 
 class Client : protected CommunicationUtils
 {
@@ -33,9 +34,10 @@ private:
     static int server_socket;             // Socket for remote server communication
     struct sockaddr_in server_address;    // Server socket address
 
-    static pthread_t input_handler_thread; // Thread to listen for new incoming server messages
-    static pthread_t keep_alive_thread;    // Thread to keep the client "alive" by sending periodic messages to server
-    static pthread_t ui_update_thread;     // Thread to keep UI timer and info up-to-date
+    static pthread_t input_handler_thread;     // Thread to listen for new incoming server messages
+    static pthread_t keep_alive_thread;        // Thread to keep the client "alive" by sending periodic messages to server
+    static pthread_t ui_update_thread;         // Thread to keep UI timer and info up-to-date
+    static pthread_t election_listener_thread; // Thread to listen to the result of an election
 
     static RW_Monitor socket_monitor; // Monitor that controls the sending of data through the socket
 
@@ -47,8 +49,9 @@ public:
      * @param groupname Chat room the user wishes to join, must be between 4-20 characters (inclusive) and be composed of only letters, numbers and dots(.)
      * @param server_ip IP Address for the remote server, formatted in IPv4 (x.x.x.x)
      * @param server_port Port the remote server is listening at
+     * @param listen_port Port to listen for an election result
      */
-    Client(std::string username, std::string groupname, std::string server_ip, std::string server_port);
+    Client(std::string username, std::string groupname, std::string server_ip, std::string server_port, std::string listen_port);
 
     /**
      * Class destructor
@@ -77,6 +80,11 @@ private:
      * Loops sending messages to server in order to keep the connection "alive"
      */
     static void *keepAlive(void *arg);
+
+   /**
+    * Thread procedure that handles the socket for incomming election results
+    */
+    static void* startElectionListener(void *arg);
 };
 
 #endif
