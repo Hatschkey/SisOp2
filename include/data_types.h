@@ -33,8 +33,17 @@ typedef struct __message_record
 
 // REPLICA UPDATES
 
+// Struct for updating new replicas with the current existing ones
+typedef struct
+{
+    int identifier; // Replica unique ID
+    int port;       // Replica listening port
+                    // TODO Ip? not really needed
+
+} replica_update;
+
 // Struct for registering a new front end into the replica's list
-typedef struct __front_end_register
+typedef struct
 {
     char ip[16];         // Front-end IP address
     uint16_t port;       // Front-end listening port

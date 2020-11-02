@@ -25,6 +25,7 @@
 #include <pthread.h>
 #include <atomic>
 #include <string.h>
+#include <unistd.h>
 
 #ifndef REPLICA_MANAGER_H
 #define REPLICA_MANAGER_H
@@ -77,9 +78,10 @@ private:
     static int leader;            // Current leader process
     static int leader_port;       // Current leader port
     static std::string leader_ip; // Current leader's IP address
+    static int leader_socket;     // Socket where communication with the leader is going on
 
-    static std::map<int, int> replicas; // Current replicas id/listening-port map
-    static RW_Monitor replicas_monitor; // Monitor for the replica list
+    static std::map<int, std::pair<int, int>> replicas; // Current replicas socket - id - listening-port map
+    static RW_Monitor replicas_monitor;                 // Monitor for the replica list
 
     // TODO Election logic
 
@@ -114,8 +116,12 @@ public:
 
     /**
      * @brief Setus up the socket for connecting to the current leader 
+     * @param new_replica_port  Port of the replica being connected to
+     * @param new_replica_ip    Ip address of the replica being connected to
+     * @param new_replica_id    Identifier of the replica being connected to
+     * @returns Replica communication socket descriptor
      */
-    static void setupReplicaConnection();
+    static int setupReplicaConnection(int new_replica_port, std::string new_replica_ip, int new_replica_id);
 
     /**
      * @brief Setus up the socket for listening to connections 
@@ -147,7 +153,7 @@ public:
     /**
      * @brief Handles communication with the other replica managers 
      */
-    static void handleRMConnection(int socket);
+    static void *handleRMConnection(void *arg);
 
     /**
      * @brief Sends messages to other replicas periodically, to detect server failure
@@ -157,13 +163,22 @@ public:
     // REPLICATION LOGIC
 
     /**
+     * @brief Sends information about replica managers and front-ends that
+     * are connected to the current master (ip and port, for example)
+     * @param socket   Socket where the communication with the replica is currently happening
+     * @param new_id   Indentifier of the new replica that is connecting
+     * @param new_port Port where the new replica is listening at
+     */
+    static void catchUpReplica(int socket, int new_id, int new_port);
+
+    /**
      * @brief Propagates a state update to all the other replicas.
      * OBS.: This should be used only by the current leader
      * @param update_payload Data being sent to the replicas
      * @param payload_size The size of the data being sent
      * @param type The type of update being sent
      */
-    static void updateReplicas(void *update_payload, int payload_size, int type);
+    static void updateAllReplicas(void *update_payload, int payload_size, int type);
 
     // BUSINESS LOGIC
 
@@ -197,6 +212,11 @@ public:
      * @brief Lists all threads running 
      */
     static void listThreads();
+
+    /**
+     * @brief Simulates a replica crash by stopping the keep-alive thread 
+     */
+    static void simulateCrash();
 };
 
 #endif

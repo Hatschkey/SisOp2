@@ -8,7 +8,8 @@ std::map<std::string, command_function> ReplicaManager::available_commands = {
     {"stop", &ReplicaManager::issueStop},
     {"list groups", &Group::listGroups},
     {"list users", &User::listUsers},
-    {"list threads", &ReplicaManager::listThreads}
+    {"list threads", &ReplicaManager::listThreads},
+    {"sim crash", &ReplicaManager::simulateCrash}
 
 };
 pthread_t ReplicaManager::command_handler_thread;
@@ -32,12 +33,13 @@ RW_Monitor ReplicaManager::rm_threads_monitor;
 pthread_t ReplicaManager::keep_alive_thread;
 
 // Election logic
-int ReplicaManager::leader;            // Current leader process
-int ReplicaManager::leader_port;       // Current leader port
-std::string ReplicaManager::leader_ip; // Current leader's IP address
+int ReplicaManager::leader;
+int ReplicaManager::leader_port;
+std::string ReplicaManager::leader_ip;
+int ReplicaManager::leader_socket;
 
-std::map<int, int> ReplicaManager::replicas; // Current replicas id/listening-port map
-RW_Monitor ReplicaManager::replicas_monitor; // Monitor for the replica list
+std::map<int, std::pair<int, int>> ReplicaManager::replicas;
+RW_Monitor ReplicaManager::replicas_monitor;
 
 // Business logic
 int ReplicaManager::message_history;
@@ -59,14 +61,14 @@ ReplicaManager::ReplicaManager(int history, int port_, int id_, std::string lead
     // If this is not the leader replica
     if (this->leader != this->ID)
     {
-        // Setup the new connection
-        ReplicaManager::setupReplicaConnection();
+        // Setup the new connection with leader
+        ReplicaManager::leader_socket = ReplicaManager::setupReplicaConnection(leader_port_, leader_ip_, leader_);
 
         // Spawn thread to communicate with leader, and add it to the list
         pthread_t leader_communication;
         pthread_create(&leader_communication, NULL, leaderCommunication, NULL);
 
-        replica_manager_threads.insert(std::make_pair(replicas.at(ReplicaManager::leader), leader_communication));
+        replica_manager_threads.insert(std::make_pair(leader_socket, leader_communication));
     }
 
     // Setup connection
@@ -87,31 +89,33 @@ ReplicaManager::~ReplicaManager()
     // TODO Anything else?
 }
 
-void ReplicaManager::setupReplicaConnection()
+int ReplicaManager::setupReplicaConnection(int new_replica_port, std::string new_replica_ip, int new_replica_id)
 {
-    int leader_socket = -1;
+    int new_socket = -1;
 
     // Create socket
-    if ((leader_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+    if ((new_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0)
         throw std::runtime_error(appendErrorMessage("Error during socket creation"));
 
     // Fill server socket address
     server_address.sin_family = AF_INET;
-    server_address.sin_port = htons(ReplicaManager::leader_port);
-    server_address.sin_addr.s_addr = inet_addr(ReplicaManager::leader_ip.c_str());
+    server_address.sin_port = htons(new_replica_port);
+    server_address.sin_addr.s_addr = inet_addr(new_replica_ip.c_str());
 
-    // Try to connect to remote server
-    if (connect(leader_socket, (struct sockaddr *)&server_address, sizeof(server_address)) < 0)
+    // Try to connect to replica
+    if (connect(new_socket, (struct sockaddr *)&server_address, sizeof(server_address)) < 0)
         throw std::runtime_error(appendErrorMessage("Error connecting to server"));
 
     // Request write rights
     replicas_monitor.requestWrite();
 
     // Add to replica manager list
-    replicas.insert(std::make_pair(ReplicaManager::leader, leader_socket));
+    replicas.insert(std::make_pair(new_socket, std::make_pair(new_replica_id, new_replica_port)));
 
     // Release write rights
     replicas_monitor.releaseWrite();
+
+    return new_socket;
 }
 
 void ReplicaManager::setupLeaderConnection()
@@ -137,12 +141,21 @@ void ReplicaManager::setupLeaderConnection()
 
 void *ReplicaManager::leaderCommunication(void *arg)
 {
-    // Link to current leader
-    char payload = '\0';
-    CommunicationUtils::sendPacket(ReplicaManager::replicas.at(ReplicaManager::leader), PAK_LINK, &payload, sizeof(payload));
+    replica_update *link_message = NULL;
+
+    // Compose link message
+    link_message = CommunicationUtils::composeReplicaUpdate(ReplicaManager::ID, ReplicaManager::port);
+
+    // Send link message to current leader
+    CommunicationUtils::sendPacket(ReplicaManager::leader_socket, PAK_LINK, (char *)link_message, sizeof(replica_update));
+
+    // Free data structure
+    free(link_message);
 
     // Handle connection with replica manager passing it's socket as argument
-    handleRMConnection(replicas.at(ReplicaManager::leader));
+    handleRMConnection((void *)&ReplicaManager::leader_socket);
+
+    return NULL;
 }
 
 void *ReplicaManager::listenConnections(void *arg)
@@ -159,6 +172,8 @@ void *ReplicaManager::listenConnections(void *arg)
     // Output ready info
     std::cout << "Replica " << ReplicaManager::ID << " ready to receive new connections" << std::endl;
     std::cout << "Current leader is " << ReplicaManager::leader << std::endl;
+    std::cout << "Available commands are: " << std::endl;
+    ReplicaManager::listCommands();
 
     // Wait for new connections
     while (!stop_issued && (socket = accept(main_socket, (struct sockaddr *)&client_address, (socklen_t *)&sockaddr_size)) > 0)
@@ -235,14 +250,12 @@ void *ReplicaManager::listenConnections(void *arg)
 
 void *ReplicaManager::handleUnkownConnection(void *arg)
 {
-    int socket = *(int *)arg; // Socket assigned to connection
-
-    struct timeval timeout; // Timeout struct
-
-    char buffer[PACKET_MAX]; // Buffer for message
-    int read_bytes = -1;     // Number of bytes read from socket
-
-    packet *received_packet = NULL; // Received message as a packet structure
+    int socket = *(int *)arg;           // Socket assigned to connection
+    struct timeval timeout;             // Timeout struct
+    char buffer[PACKET_MAX];            // Buffer for message
+    int read_bytes = -1;                // Number of bytes read from socket
+    packet *received_packet = NULL;     // Received message as a packet structure
+    replica_update *new_replica = NULL; // New replica communication info
 
     pthread_t self = pthread_self(); // Get current thread id
 
@@ -284,6 +297,9 @@ void *ReplicaManager::handleUnkownConnection(void *arg)
             break;
         case PAK_LINK: // Link packet, came from a replica
 
+            // Decode update
+            new_replica = (replica_update *)(received_packet->_payload);
+
             // Request write rights
             rm_threads_monitor.requestWrite();
 
@@ -293,17 +309,33 @@ void *ReplicaManager::handleUnkownConnection(void *arg)
             // Release write rights
             rm_threads_monitor.releaseWrite();
 
+            // Request write rights
+            replicas_monitor.requestWrite();
+
+            // Update replica list
+            replicas.insert(std::make_pair(socket, std::make_pair(new_replica->identifier, new_replica->port)));
+
+            // Release write rights
+            replicas_monitor.releaseWrite();
+
             // Set the keep-alive timer on the socket
             timeout = {.tv_sec = SERVER_TIMEOUT, .tv_usec = 0};
             if (setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout, sizeof(timeout)) < 0)
                 throw std::runtime_error(appendErrorMessage("Error setting socket options"));
 
+            // If this is the leader
+            if (ReplicaManager::ID == ReplicaManager::leader)
+            {
+                // Send information about connected front-ends and replicas
+                ReplicaManager::catchUpReplica(socket, new_replica->identifier, new_replica->port);
+            }
+
             // Start listening for next messages
-            ReplicaManager::handleRMConnection(socket);
+            ReplicaManager::handleRMConnection((void *)&socket);
 
             break;
         default: // Anything else does not make sense
-            std::cerr << "Unknown packet type (" << received_packet->type << ") received from socket " << socket << std::endl;
+            std::cerr << "Invalid packet type (" << received_packet->type << ") received from socket " << socket << std::endl;
             break;
         }
     }
@@ -334,7 +366,7 @@ void ReplicaManager::handleFEConnection(int socket, packet *login)
     front_end = CommunicationUtils::composeLoginUpdate((char *)login->_payload, front_end_ip, front_end_port, socket);
 
     // Update replicas
-    ReplicaManager::updateReplicas((void *)front_end, sizeof(login_update) + front_end->length, PAK_UPDATE_LOGIN);
+    ReplicaManager::updateAllReplicas((void *)front_end, sizeof(login_update) + front_end->length, PAK_UPDATE_LOGIN);
 
     // Free front end registry
     free(front_end);
@@ -361,7 +393,7 @@ void ReplicaManager::handleFEConnection(int socket, packet *login)
     // Add to list of front ends
     ReplicaManager::clients.insert(std::make_pair(socket, std::make_pair(front_end_ip, front_end_port)));
 
-    // release write rights
+    // Release write rights
     clients_monitor.releaseWrite();
 
     // Wait for messages
@@ -385,7 +417,7 @@ void ReplicaManager::handleFEConnection(int socket, packet *login)
             update = CommunicationUtils::composeMessageUpdate(message, current_session->getGroup()->groupname, socket);
 
             // Update replicas
-            ReplicaManager::updateReplicas((void *)update, sizeof(message_update) + update->length, PAK_UPDATE_MSG);
+            ReplicaManager::updateAllReplicas((void *)update, sizeof(message_update) + update->length, PAK_UPDATE_MSG);
 
             // Free message update structure
             free(update);
@@ -409,7 +441,7 @@ void ReplicaManager::handleFEConnection(int socket, packet *login)
     }
 
     // Update replicas
-    ReplicaManager::updateReplicas((void *)&socket, sizeof(int), PAK_UPDATE_DISCONNECT);
+    ReplicaManager::updateAllReplicas((void *)&socket, sizeof(int), PAK_UPDATE_DISCONNECT);
 
     // Request write rights
     ReplicaManager::session_monitor.requestWrite();
@@ -446,8 +478,10 @@ void ReplicaManager::handleFEConnection(int socket, packet *login)
     return;
 }
 
-void ReplicaManager::handleRMConnection(int socket)
+void *ReplicaManager::handleRMConnection(void *arg)
 {
+    int socket = *(int *)arg;
+
     int read_bytes = -1;     // Number of bytes read from socket
     char buffer[PACKET_MAX]; // Buffer for message
     int client_socket = -1;
@@ -458,11 +492,17 @@ void ReplicaManager::handleRMConnection(int socket)
     message_update *update = NULL;  // Structure for incoming group message updates
     Session *new_session = NULL;    // Client sessions
 
+    replica_update *new_rm = NULL; // New replica manager data
+    int rm_socket = -1;            // New replica manager's assigned socket
+
+    pthread_t rm_thread; // Spawned thread for handling new replicas
+
     // References to user and group
     Group *group = NULL;
 
     // Wait for messages
-    while (!stop_issued && (read_bytes = recv(socket, buffer, PACKET_MAX, 0)) > 0)
+    /*read_bytes = recv(socket, buffer, PACKET_MAX, 0)) > 0*/
+    while (!stop_issued && (read_bytes = CommunicationUtils::receivePacket(socket, buffer, PACKET_MAX)) > 0)
     {
         // Decode received message into a packet structure
         received_packet = (packet *)buffer;
@@ -473,7 +513,7 @@ void ReplicaManager::handleRMConnection(int socket)
         // Based on packet type
         switch (received_packet->type)
         {
-        case PAK_UPDATE_LOGIN:
+        case PAK_UPDATE_LOGIN: // Client connected
 
             // Decode payload into a front end registry structure
             fe_info = (login_update *)(received_packet->_payload);
@@ -501,7 +541,7 @@ void ReplicaManager::handleRMConnection(int socket)
             }
 
             break;
-        case PAK_UPDATE_MSG:
+        case PAK_UPDATE_MSG: // Client sent a message
 
             // Decode payload into message update and it's payload into a message record
             update = (message_update *)received_packet->_payload;
@@ -514,7 +554,7 @@ void ReplicaManager::handleRMConnection(int socket)
             group->saveMessage(message->_message, message->username, message->type);
 
             break;
-        case PAK_UPDATE_DISCONNECT:
+        case PAK_UPDATE_DISCONNECT: // Client disconnected
 
             // Get corresponding disconnect socket from received packet payload
             client_socket = *(int *)(received_packet->_payload);
@@ -544,10 +584,45 @@ void ReplicaManager::handleRMConnection(int socket)
             client_socket = -1;
 
             break;
-        case PAK_ELECTION:
+        case PAK_UPDATE_REPLICA: // A new replica connected
+
+            // Decode structure into a replica update packet
+            new_rm = (replica_update *)(received_packet->_payload);
+
+            // Setup the connection to this new replica //TODO Specific IP maybe? In our case its always localhost so doesn't matter
+            rm_socket = ReplicaManager::setupReplicaConnection(new_rm->port, "127.0.0.1", new_rm->identifier);
+
+            // Spawn a new thread to handle that connection
+            if (pthread_create(&rm_thread, NULL, handleRMConnection, (void *)&rm_socket) < 0)
+            {
+                // Close socket if no thread was created
+                std::cerr << "Could not create thread for new replica manager (" << new_rm->identifier << ") at socket " << socket << std::endl;
+                close(rm_socket);
+            }
+
+            // Send a link packet to the new replica manager
+            new_rm = CommunicationUtils::composeReplicaUpdate(ReplicaManager::ID, ReplicaManager::port);
+
+            // Send greetings to new replica
+            CommunicationUtils::sendPacket(rm_socket, PAK_LINK, (char *)new_rm, sizeof(replica_update));
+
+            // Free data structure
+            free(new_rm);
+
+            // Request write rights
+            rm_threads_monitor.requestWrite();
+
+            // Add thread to list of replica manager communication threads
+            replica_manager_threads.insert(std::make_pair(rm_socket, rm_thread));
+
+            // Release write rights
+            rm_threads_monitor.releaseWrite();
+
+            break;
+        case PAK_ELECTION: // An election is happening
             // TODO Process election stuff
             break;
-        case PAK_KEEP_ALIVE:
+        case PAK_KEEP_ALIVE: // Keep-Alive
             // Do nothing
             break;
         default:
@@ -558,18 +633,22 @@ void ReplicaManager::handleRMConnection(int socket)
         bzero((void *)buffer, PACKET_MAX);
     }
 
+    // If this was leader that timed out
+    if (ReplicaManager::leader == socket)
+    {
+        // Debug
+        std::cout << "Current leader (Replica " << socket << ") has stopped, starting election..." << std::endl;
+
+        // TODO START ELECTION
+    }
+
     // Check if connection ended due to timeout
     if (errno == EAGAIN || errno == EWOULDBLOCK)
     {
         std::cout << "Replica at socket " << socket << " timed out" << std::endl;
+
         // Close socket
         close(socket);
-
-        // If this was leader that timed out
-        if (ReplicaManager::leader == socket)
-        {
-            // TODO START ELECTION
-        }
     }
     else
     {
@@ -586,6 +665,8 @@ void ReplicaManager::handleRMConnection(int socket)
             rm_threads_monitor.releaseWrite();
         }
     }
+
+    pthread_exit(NULL);
 }
 
 void *ReplicaManager::keepAlive(void *arg)
@@ -618,7 +699,82 @@ void *ReplicaManager::keepAlive(void *arg)
     pthread_exit(NULL);
 }
 
-void ReplicaManager::updateReplicas(void *update_payload, int payload_size, int type)
+// REPLICATION UPDATES LOGIC
+
+void ReplicaManager::catchUpReplica(int socket, int new_id, int new_port)
+{
+    replica_update *update = NULL;
+    replica_update *new_replica = NULL;
+    message_record *login_data = NULL;
+    login_update *front_end_data = NULL;
+    Session *session = NULL;
+
+    // Request read rights
+    replicas_monitor.requestRead();
+
+    // Create a replica update structure for the new replica
+    new_replica = CommunicationUtils::composeReplicaUpdate(new_id, new_port);
+
+    // Iterate list of replica managers
+    for (auto i = ReplicaManager::replicas.begin(); i != ReplicaManager::replicas.end(); ++i)
+    {
+        if ((i->second).first != new_id)
+        {
+            // Create a replica update structure for the existing replica
+            update = CommunicationUtils::composeReplicaUpdate((i->second).first, (i->second).second);
+
+            // Send to new replica
+            CommunicationUtils::sendPacket(socket, PAK_UPDATE_REPLICA, (char *)update, sizeof(replica_update));
+
+            // Free data structure
+            free(update);
+            update = NULL;
+        }
+    }
+
+    // Free new replica update data structure
+    free(new_replica);
+    new_replica = NULL;
+
+    // Release read rights
+    replicas_monitor.releaseRead();
+
+    // Request read rights
+    clients_monitor.requestRead();
+
+    // Iterate list of connected front-ends
+    for (auto i = ReplicaManager::clients.begin(); i != clients.end(); ++i)
+    {
+        // Request read rights
+        session_monitor.requestRead();
+
+        // Get reference to session of this front-end
+        session = session_list.at(i->first);
+
+        // Release read rights
+        session_monitor.releaseRead();
+
+        // Compose a login message record
+        login_data = CommunicationUtils::composeMessage(session->getUser()->username, session->getGroup()->groupname, PAK_COMMAND);
+
+        // Composed a login update
+        front_end_data = CommunicationUtils::composeLoginUpdate((char *)login_data, (i->second).first, (i->second).second, i->first);
+
+        // Send to new replica
+        CommunicationUtils::sendPacket(socket, PAK_UPDATE_LOGIN, (char *)front_end_data, sizeof(login_update) + front_end_data->length);
+
+        // Free composed data structures
+        free(login_data);
+        free(front_end_data);
+        login_data = NULL;
+        front_end_data = NULL;
+    }
+
+    // Release read rights
+    clients_monitor.releaseRead();
+}
+
+void ReplicaManager::updateAllReplicas(void *update_payload, int payload_size, int type)
 {
     // Request read rights
     rm_threads_monitor.requestRead();
@@ -767,6 +923,7 @@ void ReplicaManager::listThreads()
 
     // Request read rights
     rm_threads_monitor.requestRead();
+    replicas_monitor.requestRead();
 
     // Delimiter
     std::cout << "REPLICA MANAGER THREADS" << std::endl;
@@ -776,10 +933,27 @@ void ReplicaManager::listThreads()
     for (std::map<int, pthread_t>::iterator i = replica_manager_threads.begin(); i != replica_manager_threads.end(); ++i)
     {
         std::cout << " RM Thread associated with socket " << i->first << std::endl;
+        std::cout << " + This thread is talking to a replica with ID " << replicas.at(i->first).first << std::endl;
     }
     // Delimiter
     std::cout << "======================" << std::endl;
 
     // Release read rights
     rm_threads_monitor.releaseRead();
+    replicas_monitor.releaseRead();
+}
+
+void ReplicaManager::simulateCrash()
+{
+    std::cout << "Stopping keep-alive thread..." << std::endl;
+
+    // Shutdown keep-alive thread
+    pthread_cancel(ReplicaManager::keep_alive_thread);
+    pthread_join(keep_alive_thread, NULL);
+
+    // Sleep for 2*timeout seconds so the other replicas can notice and complete election
+    sleep(2 * SERVER_TIMEOUT);
+
+    // End
+    ReplicaManager::issueStop();
 }

@@ -5,6 +5,20 @@ std::string CommunicationUtils::appendErrorMessage(const std::string message)
     return message + " (" + std::string(strerror(errno)) + ")";
 }
 
+replica_update *CommunicationUtils::composeReplicaUpdate(int identifier, int port)
+{
+    // Create structure
+    replica_update *update = (replica_update *)malloc(sizeof(replica_update));
+    bzero((void *)update, sizeof(replica_update));
+
+    // Fill data
+    update->identifier = identifier;
+    update->port = port;
+
+    // Return created structure
+    return update;
+}
+
 message_update *CommunicationUtils::composeMessageUpdate(message_record *message, std::string groupname, int socket)
 {
     // Calculate message size

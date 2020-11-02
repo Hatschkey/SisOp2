@@ -14,23 +14,28 @@
 #define MESSAGE_MAX    256     // Maximum size (in bytes) for a user message
 #define SLEEP_TIME     1       // Time (in seconds) between keep-alive packets
 
-// Packet types
+// Packet types regarding chat messages
 #define PAK_DATA              1 // Message packet
 #define PAK_COMMAND           2 // Command packet
 #define PAK_KEEP_ALIVE        3 // Keep-Alive packet
 #define PAK_SERVER_MESSAGE    4 // Server message packet
-#define PAK_ELECTION          5 // Election packet (used by server)
-#define PAK_UPDATE_DISCONNECT 6 // Disconnect packet (Client closed application)
+
+// Packet types regarding election messages
+#define PAK_ELECTION          5 // Election packet
+
+// Packet types regarding replica updates
+#define PAK_UPDATE_DISCONNECT 6 // Update packet for client disconnections
 #define PAK_UPDATE_MSG        7 // Update packet for messages
 #define PAK_UPDATE_LOGIN      8 // Update packet with login information
-#define PAK_LINK              9 // Link packet, used for registering replicas to current master
-#define PAK_FE_REGISTER      10 // Front-End registering packet, contains IP and port of front-end, as well as login information
+#define PAK_UPDATE_REPLICA    9 // Update packet with replica information for updating new replicas
+
+// Packet types regarding replica connection
+#define PAK_LINK             10 // Link packet, used for registering replicas to current master
 
 // Message types
 #define SERVER_MESSAGE 1 // Indicates a message sent by server (login or logout message)
 #define USER_MESSAGE   2 // Indicates a message sent by a user
 #define LOGIN_MESSAGE  3 // Login message containing group the user wants to log into
-#define LOGOUT_MESSAGE 4 // Logout message containing username of the disconnected client
 
 // Election message types
 #define ELECTED_MESSAGE  1 // Message contains a request to start an election / a vote from the process
