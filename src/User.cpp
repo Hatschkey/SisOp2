@@ -191,8 +191,6 @@ int User::leaveGroup(Session *session)
 
 int User::signalNewMessage(std::string message, std::string username, std::string groupname, int packet_type, int message_type)
 {
-    int message_record_size = 0; // Size of the composed message (in bytes)
-
     // Compose a new message
     message_record *msg = CommunicationUtils::composeMessage(username, message, message_type);
 
