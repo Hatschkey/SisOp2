@@ -4,6 +4,9 @@
 #include <iostream>
 #include <map>
 #include <ctime>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
 
 // PACKET
 
