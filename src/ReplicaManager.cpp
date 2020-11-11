@@ -9,7 +9,8 @@ std::map<std::string, command_function> ReplicaManager::available_commands = {
     {"list groups", &Group::listGroups},
     {"list users", &User::listUsers},
     {"list threads", &ReplicaManager::listThreads},
-    {"sim crash", &ReplicaManager::simulateCrash}
+    {"sim crash", &ReplicaManager::simulateCrash},
+    {"list current leader", &ReplicaManager::currentLeader},
 
 };
 pthread_t ReplicaManager::command_handler_thread;
@@ -37,6 +38,8 @@ int ReplicaManager::leader;
 int ReplicaManager::leader_port;
 std::string ReplicaManager::leader_ip;
 int ReplicaManager::leader_socket;
+std::map<int, bool> ReplicaManager::replicas_answered;
+RW_Monitor ReplicaManager::ra_monitor;
 
 std::map<int, std::pair<int, int>> ReplicaManager::replicas;
 RW_Monitor ReplicaManager::replicas_monitor;
@@ -318,8 +321,20 @@ void *ReplicaManager::handleUnkownConnection(void *arg)
             // Release write rights
             replicas_monitor.releaseWrite();
 
+            if (new_replica->identifier > ReplicaManager::ID)
+            {
+                // Request write rights
+                ra_monitor.requestWrite();
+
+                // Add to the replicas_answered map 
+                replicas_answered.insert(std::make_pair(new_replica->identifier, false));
+
+                // Release write rights
+                ra_monitor.releaseWrite();
+            }
+
             // Set the keep-alive timer on the socket
-            timeout = {.tv_sec = SERVER_TIMEOUT, .tv_usec = 0};
+            timeout = {.tv_sec = REPLICA_TIMEOUT, .tv_usec = 0};
             if (setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout, sizeof(timeout)) < 0)
                 throw std::runtime_error(appendErrorMessage("Error setting socket options"));
 
@@ -500,6 +515,11 @@ void *ReplicaManager::handleRMConnection(void *arg)
     // References to user and group
     Group *group = NULL;
 
+    // To end a empty packet
+    char empty = '\0';
+    // Flag indicating if this replica already started his own election
+    bool election_started = false;
+
     // Wait for messages
     /*read_bytes = recv(socket, buffer, PACKET_MAX, 0)) > 0*/
     while (!stop_issued && (read_bytes = CommunicationUtils::receivePacket(socket, buffer, PACKET_MAX)) > 0)
@@ -619,9 +639,37 @@ void *ReplicaManager::handleRMConnection(void *arg)
             rm_threads_monitor.releaseWrite();
 
             break;
-        case PAK_ELECTION: // An election is happening
-            // TODO Process election stuff
+        case PAK_ELECTION_START: // An election is happening
+            // Answer the current election start message
+            CommunicationUtils::sendPacket(socket, PAK_ELECTION_ANSWER, &empty, sizeof(empty));
+
+            if (!election_started)
+            {  
+                election_started = true;
+                
+                // Start his own election
+                ReplicaManager::startElection();
+            }
+
             break;
+        case PAK_ELECTION_ANSWER: 
+            // Request write rights
+            ra_monitor.requestWrite();
+
+            // Add to the replicas_answered map 
+            replicas_answered[replicas[socket].first] = true;
+
+            // Release write rights
+            ra_monitor.releaseWrite();
+
+            break;
+        case PAK_ELECTION_COORDINATOR:  
+            // Update leader informations
+            leader = replicas[socket].first;
+            leader_port = replicas[socket].second;
+            leader_socket = socket;
+
+            break;     
         case PAK_KEEP_ALIVE: // Keep-Alive
             // Do nothing
             break;
@@ -633,13 +681,19 @@ void *ReplicaManager::handleRMConnection(void *arg)
         bzero((void *)buffer, PACKET_MAX);
     }
 
-    // If this was leader that timed out
-    if (ReplicaManager::leader == socket)
-    {
-        // Debug
-        std::cout << "Current leader (Replica " << socket << ") has stopped, starting election..." << std::endl;
+    replicas_monitor.requestRead();
 
-        // TODO START ELECTION
+    // Get the id of the replica whose thread was communicating with the rm who crashed
+    int buddy_replica_id = replicas.at(socket).first;
+
+    replicas_monitor.releaseRead();
+
+    // If this was leader that timed out
+    if (ReplicaManager::leader == buddy_replica_id)
+    {
+        ReplicaManager::startElection();
+
+        std::cout << "Current leader (Replica " << buddy_replica_id << ") has stopped, starting election..." << std::endl;
     }
 
     // Check if connection ended due to timeout
@@ -789,12 +843,94 @@ void ReplicaManager::updateAllReplicas(void *update_payload, int payload_size, i
 
     // Release read rights
     rm_threads_monitor.releaseRead();
+}
 
-    // TODO Wait for confirmation from each replica before proceeding (Not sure if done here)
+void ReplicaManager::startElection()
+{
+    removeReplicaLeader();
+
+    // Request read rights
+    replicas_monitor.requestRead();
+
+    int count = 0;
+    bool someone_answered = false;
+
+    char empty = '\0';
+
+    // replicas_answered
+    for (auto i = ReplicaManager::replicas.begin(); i != ReplicaManager::replicas.end(); ++i)
+    {
+        // If the current replica id is greater than the sender replica id
+        if (i->second.first > ReplicaManager::ID)
+        {
+            CommunicationUtils::sendPacket(i->first, PAK_ELECTION_START, &empty, sizeof(empty));
+            replicas_answered[i->second.first] = false;
+            count++;
+        }
+    }
+
+    // Release read rights
+    replicas_monitor.releaseRead();
+
+    // If this replica didn't send a packet to anyone, this indicates that he is now the leader
+    if (count == 0) 
+    {   
+        // Send a coordinator packet to every replica
+        ReplicaManager::updateAllReplicas(&empty, sizeof(empty), PAK_ELECTION_COORDINATOR);
+
+        // New leader informations 
+        leader = ReplicaManager::ID;
+        leader_port = ReplicaManager::port;
+        leader_socket = ReplicaManager::main_socket;
+    }
+    else
+    {
+        sleep(ELECTION_TIMEOUT); 
+
+        ra_monitor.requestRead();
+
+        for (auto i = ReplicaManager::replicas_answered.begin(); i != ReplicaManager::replicas_answered.end(); ++i)
+        {
+            if (i->second)
+            {
+                someone_answered = true;
+            }
+        }
+
+        ra_monitor.releaseRead();
+
+        // If no one has answered, this replica is the new leader
+        if (!someone_answered)
+        {
+            // Send a coordinator packet to every replica
+            ReplicaManager::updateAllReplicas(&empty, sizeof(empty), PAK_ELECTION_COORDINATOR);
+
+            // New leader informations 
+            leader = ReplicaManager::ID;
+            leader_port = ReplicaManager::port;
+            leader_socket = ReplicaManager::main_socket;
+        }
+        else 
+        {
+            // Saves the last leader id
+            uint16_t old_leader_id = ReplicaManager::ID;
+            
+            // Sleeps a time waiting for a sign indicanting that there's a new leader
+            sleep(ELECTION_TIMEOUT);
+
+            // If the old leader id equals the actual leader id
+            if (old_leader_id == ReplicaManager::ID)
+            {
+                // Means that we didn't received a PAK_COORDINATOR and there isn't a new leader
+                // So we start a election again
+                startElection();
+            }
+        }
+    }
+    
 }
 
 // BUSINESS LOGIC
-
 Session *ReplicaManager::processLogin(message_record *login_info, int socket, bool master)
 {
     // Create the session
@@ -952,8 +1088,29 @@ void ReplicaManager::simulateCrash()
     pthread_join(keep_alive_thread, NULL);
 
     // Sleep for 2*timeout seconds so the other replicas can notice and complete election
-    sleep(2 * SERVER_TIMEOUT);
+    sleep(2 * REPLICA_TIMEOUT);
 
     // End
     ReplicaManager::issueStop();
+}
+
+void ReplicaManager::removeReplicaLeader()
+{
+    replicas_monitor.requestWrite();
+
+    try
+    {
+        replicas.erase(leader_socket);
+    }
+    catch(const std::out_of_range& e)
+    {
+        // Means that the leader was already removed
+    }  
+
+    replicas_monitor.releaseWrite();
+}
+
+void ReplicaManager::currentLeader()
+{
+    std::cout << "Current leader replica is: " << ReplicaManager::leader << std::endl;
 }

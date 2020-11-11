@@ -75,15 +75,15 @@ private:
     static pthread_t keep_alive_thread; // Keep alive thread
 
     // Election logic
-    static int leader;            // Current leader process
-    static int leader_port;       // Current leader port
-    static std::string leader_ip; // Current leader's IP address
-    static int leader_socket;     // Socket where communication with the leader is going on
+    static int leader;                            // Current leader process
+    static int leader_port;                       // Current leader port
+    static std::string leader_ip;                 // Current leader's IP address
+    static int leader_socket;                     // Socket where communication with the leader is going on
+    static std::map<int, bool> replicas_answered; // Map with replica id and if the replica has answered an election or not
+    static RW_Monitor ra_monitor;                 // Monitor for the replicas_answered map
 
     static std::map<int, std::pair<int, int>> replicas; // Current replicas socket - id - listening-port map
     static RW_Monitor replicas_monitor;                 // Monitor for the replica list
-
-    // TODO Election logic
 
     // Business logic
     static int message_history;                   // How many messages are sent to client upon login
@@ -180,6 +180,19 @@ public:
      */
     static void updateAllReplicas(void *update_payload, int payload_size, int type);
 
+    // ELECTION LOGIC
+
+    /**
+     * @brief Start an election by sending PAK_ELECTION to every replica which id 
+     * is greater than the sender replice id
+     */
+    static void startElection();
+
+    /**
+     * @brief Removes the last replica leader(who crashed)
+     */
+    static void removeReplicaLeader();
+
     // BUSINESS LOGIC
 
     /**
@@ -217,6 +230,11 @@ public:
      * @brief Simulates a replica crash by stopping the keep-alive thread 
      */
     static void simulateCrash();
+
+    /**
+     * @brief Outputs current leader id
+     */
+    static void currentLeader();
 };
 
 #endif
