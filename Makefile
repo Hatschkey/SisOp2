@@ -14,8 +14,8 @@ replica: RW_Monitor Session User Group replicaApp CommunicationUtils
 server: RW_Monitor Session User Group CommunicationUtils serverApp
 	${CC} ${OBJ}serverApp.o ${OBJ}Server.o ${OBJ}RW_Monitor.o ${OBJ}Session.o ${OBJ}User.o ${OBJ}Group.o ${OBJ}CommunicationUtils.o -o ${BIN}server -lpthread -Wall
 
-client: ClientInterface CommunicationUtils RW_Monitor Client clientApp
-	${CC} ${OBJ}ClientInterface.o ${OBJ}clientApp.o ${OBJ}Client.o ${OBJ}CommunicationUtils.o ${OBJ}RW_Monitor.o -o ${BIN}client -lncurses -lpthread -Wall
+client: ClientInterface CommunicationUtils RW_Monitor Client clientApp ElectionListener
+	${CC} ${OBJ}ClientInterface.o ${OBJ}clientApp.o ${OBJ}Client.o ${OBJ}CommunicationUtils.o ${OBJ}RW_Monitor.o ${OBJ}ElectionListener.o -o ${BIN}client -lncurses -lpthread -Wall
 	
 replicaApp: ReplicaManager
 	${CC} -c ${SRC}replicaApp.cpp -I ${INC} -o ${OBJ}replicaApp.o -Wall
@@ -52,6 +52,9 @@ CommunicationUtils:
 
 ReplicaManager:
 	${CC} -c ${SRC}ReplicaManager.cpp -I ${INC} -o ${OBJ}ReplicaManager.o -Wall
+
+ElectionListener:
+	${CC} -c ${SRC}ElectionListener.cpp -I ${INC} -o ${OBJ}ElectionListener.o -Wall
 
 dirs:
 	mkdir -p ${OBJ}

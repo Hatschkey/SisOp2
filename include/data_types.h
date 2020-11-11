@@ -73,4 +73,13 @@ typedef struct __election_message
 
 } election_message;
 
+// Struct that holds the new server address
+typedef struct __new_server_addr
+{
+    in_addr_t ip;   // New server IP
+    in_port_t port; // New server Port
+
+} new_server_addr;
+
+
 #endif

@@ -6,15 +6,15 @@
 int main(int argc, char** argv)
 {
     // Parse command line input
-    if (argc < 5){
-        std::cerr << "Usage: " << argv[0] << " <username> <groupname> <server_ip_address> <port> " << std::endl;
+    if (argc < 6){
+        std::cerr << "Usage: " << argv[0] << " <username> <groupname> <server_ip_address> <port> <listen_port>" << std::endl;
         return 1;
     }
 
     try
     {
         // Create an instance of Client
-        Client client(argv[1],argv[2],argv[3],argv[4]);
+        Client client(argv[1],argv[2],argv[3],argv[4],argv[5]);
 
         // Setup a connection to the server
         client.setupConnection();
