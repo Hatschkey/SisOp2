@@ -61,11 +61,22 @@ dirs:
 	mkdir -p ${BIN}
 	mkdir -p ${HIST}
 
-clean:	
+clean:
 	rm ${OBJ}*.o ${BIN}server ${BIN}client ${BIN}replica ${HIST}*.hist
 
 run_server: ${BIN}server
 	cd ${BIN} && ./server 50
 
 run_client: ${BIN}client
-	cd ${BIN} && ./client user group localhost 6789
+	cd ${BIN} && ./client user group localhost 6789 6000
+
+run_replicas:
+	# Start leader process
+	cd ${BIN} && xterm -hold -e valgrind --show-leak-kinds=all --track-origins=yes ./replica 5 6789 0 127.0.0.1 6789 0 &
+	
+	# Start two more replcias
+	sleep 0.5
+	cd ${BIN} && xterm -hold -e valgrind --show-leak-kinds=all --track-origins=yes ./replica 5 6788 1 127.0.0.1 6789 0 &
+
+	sleep 0.5
+	cd ${BIN} && xterm -hold -e valgrind --show-leak-kinds=all --track-origins=yes ./replica 5 6787 2 127.0.0.1 6789 0 &

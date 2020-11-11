@@ -87,8 +87,6 @@ int CommunicationUtils::sendPacket(int socket, int packet_type, char *payload, i
     int packet_size = sizeof(packet) + payload_size;
     int bytes_sent = -1; // Number of bytes actually sent to the client
 
-    // TODO Sequence numbers!
-
     // Prepare packet
     packet *data = (packet *)malloc(packet_size);                                             // Malloc memory
     bzero((void *)data, packet_size);                                                         // Initialize bytes to zero
@@ -100,8 +98,9 @@ int CommunicationUtils::sendPacket(int socket, int packet_type, char *payload, i
 
     // Send packet
     if ((bytes_sent = send(socket, data, packet_size, 0)) <= 0)
-        throw std::runtime_error(appendErrorMessage("Unable to send message to server"));
-
+    { 
+        //std::cerr << appendErrorMessage("Unable to send message to server") << std::endl;
+    }
     // Free memory used for packet
     free(data);
 

@@ -9,10 +9,10 @@
 #define SERVER_PORT     6789    // Port the remote server listens at
 #define MAX_SESSIONS    2       // Maximum number of active sessions per user
 #define USER_TIMEOUT    60      // Time (in seconds) for user to be kept alive
-#define REPLICA_TIMEOUT 5       // Time (in seconds) for replica to be kept alive
+#define REPLICA_TIMEOUT 1       // Time (in seconds) for replica to be kept alive
 #define PACKET_MAX      2048    // Maximum size (in bytes) for a packet
 #define MESSAGE_MAX     256     // Maximum size (in bytes) for a user message
-#define SLEEP_TIME      1       // Time (in seconds) between keep-alive packets
+#define SLEEP_TIME      0.2      // Time (in seconds) between keep-alive packets
 
 // Packet types regarding chat messages
 #define PAK_DATA              1 // Message packet

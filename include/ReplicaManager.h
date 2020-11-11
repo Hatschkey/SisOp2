@@ -26,6 +26,7 @@
 #include <atomic>
 #include <string.h>
 #include <unistd.h>
+#include <signal.h>
 
 #ifndef REPLICA_MANAGER_H
 #define REPLICA_MANAGER_H
@@ -81,6 +82,7 @@ private:
     static int leader_socket;                     // Socket where communication with the leader is going on
     static std::map<int, bool> replicas_answered; // Map with replica id and if the replica has answered an election or not
     static RW_Monitor ra_monitor;                 // Monitor for the replicas_answered map
+    static std::atomic<bool> election_started;    // If there is a ongoing election
 
     static std::map<int, std::pair<int, int>> replicas; // Current replicas socket - id - listening-port map
     static RW_Monitor replicas_monitor;                 // Monitor for the replica list
@@ -235,6 +237,14 @@ public:
      * @brief Outputs current leader id
      */
     static void currentLeader();
+
+    // ERROR HANDLING
+
+    /**
+     * @brief Handles a write operation to a closed socket
+     * @param signal Received singal 
+     */
+    static void handleSIGPIPE(int signal);
 };
 
 #endif

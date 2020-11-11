@@ -38,8 +38,11 @@ int ReplicaManager::leader;
 int ReplicaManager::leader_port;
 std::string ReplicaManager::leader_ip;
 int ReplicaManager::leader_socket;
+
 std::map<int, bool> ReplicaManager::replicas_answered;
 RW_Monitor ReplicaManager::ra_monitor;
+
+std::atomic<bool> ReplicaManager::election_started;
 
 std::map<int, std::pair<int, int>> ReplicaManager::replicas;
 RW_Monitor ReplicaManager::replicas_monitor;
@@ -82,6 +85,9 @@ ReplicaManager::ReplicaManager(int history, int port_, int id_, std::string lead
 
     // Spawn thread for keeping replica alive
     pthread_create(&keep_alive_thread, NULL, keepAlive, NULL);
+
+    // Register error signal handler
+    signal(SIGPIPE, ReplicaManager::handleSIGPIPE);
 }
 
 ReplicaManager::~ReplicaManager()
@@ -175,7 +181,6 @@ void *ReplicaManager::listenConnections(void *arg)
     // Output ready info
     std::cout << "Replica " << ReplicaManager::ID << " ready to receive new connections" << std::endl;
     std::cout << "Current leader is " << ReplicaManager::leader << std::endl;
-    std::cout << "Available commands are: " << std::endl;
     ReplicaManager::listCommands();
 
     // Wait for new connections
@@ -195,10 +200,6 @@ void *ReplicaManager::listenConnections(void *arg)
             close(socket);
         }
     }
-
-    // On server stop
-
-    // TODO Warn other replicas so they may start an election
 
     // Issue a stop command
     ReplicaManager::issueStop();
@@ -326,7 +327,7 @@ void *ReplicaManager::handleUnkownConnection(void *arg)
                 // Request write rights
                 ra_monitor.requestWrite();
 
-                // Add to the replicas_answered map 
+                // Add to the replicas_answered map
                 replicas_answered.insert(std::make_pair(new_replica->identifier, false));
 
                 // Release write rights
@@ -517,8 +518,6 @@ void *ReplicaManager::handleRMConnection(void *arg)
 
     // To end a empty packet
     char empty = '\0';
-    // Flag indicating if this replica already started his own election
-    bool election_started = false;
 
     // Wait for messages
     /*read_bytes = recv(socket, buffer, PACKET_MAX, 0)) > 0*/
@@ -609,7 +608,7 @@ void *ReplicaManager::handleRMConnection(void *arg)
             // Decode structure into a replica update packet
             new_rm = (replica_update *)(received_packet->_payload);
 
-            // Setup the connection to this new replica //TODO Specific IP maybe? In our case its always localhost so doesn't matter
+            // Setup the connection to this new replica
             rm_socket = ReplicaManager::setupReplicaConnection(new_rm->port, "127.0.0.1", new_rm->identifier);
 
             // Spawn a new thread to handle that connection
@@ -640,36 +639,43 @@ void *ReplicaManager::handleRMConnection(void *arg)
 
             break;
         case PAK_ELECTION_START: // An election is happening
+
             // Answer the current election start message
             CommunicationUtils::sendPacket(socket, PAK_ELECTION_ANSWER, &empty, sizeof(empty));
 
             if (!election_started)
-            {  
+            {
                 election_started = true;
-                
+
                 // Start his own election
                 ReplicaManager::startElection();
-            }
+}
 
             break;
-        case PAK_ELECTION_ANSWER: 
+        case PAK_ELECTION_ANSWER:
+
+            std::cout << "Received answer packet, marking thread as answered" << std::endl;
+
             // Request write rights
             ra_monitor.requestWrite();
 
-            // Add to the replicas_answered map 
+            // Add to the replicas_answered map
             replicas_answered[replicas[socket].first] = true;
 
             // Release write rights
             ra_monitor.releaseWrite();
 
             break;
-        case PAK_ELECTION_COORDINATOR:  
+        case PAK_ELECTION_COORDINATOR:
+
+            std::cout << "Received coordinator packet, updating my leader information" << std::endl;
+
             // Update leader informations
             leader = replicas[socket].first;
             leader_port = replicas[socket].second;
             leader_socket = socket;
 
-            break;     
+            break;
         case PAK_KEEP_ALIVE: // Keep-Alive
             // Do nothing
             break;
@@ -683,17 +689,26 @@ void *ReplicaManager::handleRMConnection(void *arg)
 
     replicas_monitor.requestRead();
 
-    // Get the id of the replica whose thread was communicating with the rm who crashed
-    int buddy_replica_id = replicas.at(socket).first;
+    int buddy_replica_id = -1;
+
+    try
+    {
+        // Get the id of the replica whose thread was communicating with the rm who crashed
+        buddy_replica_id = replicas.at(socket).first;
+    }
+    catch (const std::out_of_range &e)
+    {
+        // Leader was removed in a prior election
+    }
 
     replicas_monitor.releaseRead();
 
     // If this was leader that timed out
-    if (ReplicaManager::leader == buddy_replica_id)
+    if (ReplicaManager::leader == buddy_replica_id && !election_started && !stop_issued)
     {
-        ReplicaManager::startElection();
-
         std::cout << "Current leader (Replica " << buddy_replica_id << ") has stopped, starting election..." << std::endl;
+
+        ReplicaManager::startElection();
     }
 
     // Check if connection ended due to timeout
@@ -851,6 +866,7 @@ void ReplicaManager::startElection()
 
     // Request read rights
     replicas_monitor.requestRead();
+    ra_monitor.requestWrite();
 
     int count = 0;
     bool someone_answered = false;
@@ -871,63 +887,66 @@ void ReplicaManager::startElection()
 
     // Release read rights
     replicas_monitor.releaseRead();
+    ra_monitor.releaseWrite();
 
     // If this replica didn't send a packet to anyone, this indicates that he is now the leader
-    if (count == 0) 
-    {   
+    if (count == 0)
+    {
         // Send a coordinator packet to every replica
         ReplicaManager::updateAllReplicas(&empty, sizeof(empty), PAK_ELECTION_COORDINATOR);
 
-        // New leader informations 
+        // New leader informations
         leader = ReplicaManager::ID;
         leader_port = ReplicaManager::port;
         leader_socket = ReplicaManager::main_socket;
     }
     else
     {
-        sleep(ELECTION_TIMEOUT); 
+        // Saves the last leader id
+        int old_leader_id = ReplicaManager::leader;
 
-        ra_monitor.requestRead();
+        sleep(ELECTION_TIMEOUT);
 
-        for (auto i = ReplicaManager::replicas_answered.begin(); i != ReplicaManager::replicas_answered.end(); ++i)
+        if (old_leader_id == ReplicaManager::leader)
         {
-            if (i->second)
+            ra_monitor.requestRead();
+
+            for (auto i = ReplicaManager::replicas_answered.begin(); i != ReplicaManager::replicas_answered.end(); ++i)
             {
-                someone_answered = true;
+                if (i->second)
+                {
+                    someone_answered = true;
+                }
             }
-        }
 
-        ra_monitor.releaseRead();
+            ra_monitor.releaseRead();
 
-        // If no one has answered, this replica is the new leader
-        if (!someone_answered)
-        {
-            // Send a coordinator packet to every replica
-            ReplicaManager::updateAllReplicas(&empty, sizeof(empty), PAK_ELECTION_COORDINATOR);
-
-            // New leader informations 
-            leader = ReplicaManager::ID;
-            leader_port = ReplicaManager::port;
-            leader_socket = ReplicaManager::main_socket;
-        }
-        else 
-        {
-            // Saves the last leader id
-            uint16_t old_leader_id = ReplicaManager::ID;
-            
-            // Sleeps a time waiting for a sign indicanting that there's a new leader
-            sleep(ELECTION_TIMEOUT);
-
-            // If the old leader id equals the actual leader id
-            if (old_leader_id == ReplicaManager::ID)
+            // If no one has answered, this replica is the new leader
+            if (!someone_answered)
             {
-                // Means that we didn't received a PAK_COORDINATOR and there isn't a new leader
-                // So we start a election again
-                startElection();
+                // Send a coordinator packet to every replica
+                ReplicaManager::updateAllReplicas(&empty, sizeof(empty), PAK_ELECTION_COORDINATOR);
+
+                // New leader informations
+                leader = ReplicaManager::ID;
+                leader_port = ReplicaManager::port;
+                leader_socket = ReplicaManager::main_socket;
+            }
+            else
+            {
+                // Sleeps a time waiting for a sign indicanting that there's a new leader
+                sleep(ELECTION_TIMEOUT);
+
+                // If the old leader id equals the actual leader id
+                if (old_leader_id == ReplicaManager::leader)
+                {
+                    // Means that we didn't received a PAK_COORDINATOR and there isn't a new leader
+                    // So we start a election again
+                    startElection();
+                }
             }
         }
     }
-    
 }
 
 // BUSINESS LOGIC
@@ -1097,20 +1116,30 @@ void ReplicaManager::simulateCrash()
 void ReplicaManager::removeReplicaLeader()
 {
     replicas_monitor.requestWrite();
+    ra_monitor.requestWrite();
 
     try
     {
         replicas.erase(leader_socket);
+        replicas_answered.erase(ReplicaManager::leader);
     }
-    catch(const std::out_of_range& e)
+    catch (const std::out_of_range &e)
     {
         // Means that the leader was already removed
-    }  
+    }
 
     replicas_monitor.releaseWrite();
+    ra_monitor.releaseWrite();
 }
 
 void ReplicaManager::currentLeader()
 {
     std::cout << "Current leader replica is: " << ReplicaManager::leader << std::endl;
+}
+
+// ERROR SIGNAL HANDLERS
+
+void ReplicaManager::handleSIGPIPE(int signal)
+{
+    //std::cerr << "Error sending packet " << std::endl;
 }

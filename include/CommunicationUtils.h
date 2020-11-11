@@ -5,6 +5,7 @@
 #include <string>
 #include <cstring>
 #include <errno.h>
+#include <signal.h>
 #include <chrono>
 
 #include "data_types.h"
