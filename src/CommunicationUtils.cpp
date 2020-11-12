@@ -5,6 +5,29 @@ std::string CommunicationUtils::appendErrorMessage(const std::string message)
     return message + " (" + std::string(strerror(errno)) + ")";
 }
 
+coordinator *CommunicationUtils::composeCoordinatorUpdate(std::map<int, int> translation)
+{
+    // Create the arrays of old and new sockets
+    uint16_t *sockets = (uint16_t *)malloc(sizeof(uint16_t) * 2 * translation.size());
+    bzero((void *)sockets, sizeof(uint16_t) * 2 * translation.size());
+
+    // Fill array
+    size_t offset = 0;
+    for (auto i = translation.begin(); i != translation.end(); ++i, offset += 2)
+    {
+        sockets[offset] = i->first;
+        sockets[offset + 1] = i->second;
+    }
+
+    // Create the coordinator packet message
+    coordinator *coord = (coordinator *)malloc(sizeof(uint16_t) + (2 * sizeof(uint16_t) * translation.size()));
+    coord->counter = (uint16_t)translation.size();
+    if (coord->counter > 0)
+        memcpy((char *)coord->_sockets, sockets, sizeof(uint16_t) * 2 * translation.size());
+
+    return coord;
+}
+
 replica_update *CommunicationUtils::composeReplicaUpdate(int identifier, int port)
 {
     // Create structure
@@ -22,7 +45,7 @@ replica_update *CommunicationUtils::composeReplicaUpdate(int identifier, int por
 message_update *CommunicationUtils::composeMessageUpdate(message_record *message, std::string groupname, int socket)
 {
     // Calculate message size
-    int message_size = sizeof(message) + message->length;
+    int message_size = sizeof(message_record) + message->length;
 
     // Allocate memory for message update
     message_update *new_update = (message_update *)malloc(sizeof(message_update) + message_size);
@@ -31,7 +54,22 @@ message_update *CommunicationUtils::composeMessageUpdate(message_record *message
     // Fill data
     strcpy(new_update->groupname, groupname.c_str());
     new_update->socket = socket;
+    new_update->length = message_size;
     memcpy((char *)new_update->_message, message, message_size);
+
+    /*
+    std::cout << "Composed a message update packet:" << std::endl;
+    std::cout << "Groupname: " << new_update->groupname << std::endl;
+    std::cout << "Socket: " << new_update->socket << std::endl;
+    std::cout << "Length: " << new_update->length << std::endl;
+    std::cout << "+ Message record: " << std::endl;
+    std::cout << "| Username" << ((message_record *)new_update->_message)->username << std::endl;
+    std::cout << "| Port: " << ((message_record *)new_update->_message)->port << std::endl;
+    std::cout << "| Length: " << ((message_record *)new_update->_message)->length << std::endl;
+    std::cout << "| Type: " << ((message_record *)new_update->_message)->type << std::endl;
+    std::cout << "| Timestamp: " << ((message_record *)new_update->_message)->timestamp << std::endl;
+    std::cout << "| Message: " << ((message_record *)new_update->_message)->_message << std::endl;
+    */
 
     // Return created message update structure
     return new_update;
@@ -98,9 +136,10 @@ int CommunicationUtils::sendPacket(int socket, int packet_type, char *payload, i
 
     // Send packet
     if ((bytes_sent = send(socket, data, packet_size, 0)) <= 0)
-    { 
+    {
         //std::cerr << appendErrorMessage("Unable to send message to server") << std::endl;
     }
+
     // Free memory used for packet
     free(data);
 
@@ -108,15 +147,16 @@ int CommunicationUtils::sendPacket(int socket, int packet_type, char *payload, i
     return bytes_sent;
 }
 
-message_record *CommunicationUtils::composeMessage(std::string sender_name, std::string message_content, int message_type)
+message_record *CommunicationUtils::composeMessage(std::string sender_name, std::string message_content, int message_type, int port)
 {
     // Calculate total size of the message record struct
     int record_size = sizeof(message_record) + (message_content.length() + 1);
 
     // Create a record for the message
-    message_record *msg = (message_record *)malloc(record_size);                             // Malloc memory
-    bzero((void *)msg, record_size);                                                         // Initialize bytes to zero
-    strcpy(msg->username, sender_name.c_str());                                              // Copy sender name
+    message_record *msg = (message_record *)malloc(record_size); // Malloc memory
+    bzero((void *)msg, record_size);                             // Initialize bytes to zero
+    strcpy(msg->username, sender_name.c_str());                  // Copy sender name
+    msg->port = port;
     msg->timestamp = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()); // Current timestamp
     msg->type = message_type;                                                                // Update message type
     msg->length = message_content.length() + 1;                                              // Update message length

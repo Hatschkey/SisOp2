@@ -1,7 +1,10 @@
 #include "Client.h"
 
+std::atomic<bool> Client::server_down;
 std::atomic<bool> Client::stop_issued;
 int Client::server_socket;
+int Client::server_port;
+int Client::listen_port;
 
 pthread_t Client::input_handler_thread;
 pthread_t Client::keep_alive_thread;
@@ -10,6 +13,72 @@ pthread_t Client::election_listener_thread;
 
 std::string Client::username;
 RW_Monitor Client::socket_monitor;
+
+// Election listener
+int Client::ElectionListener::server_socket;
+int Client::ElectionListener::listen_port;
+
+Client::ElectionListener::ElectionListener(int N)
+{
+    if (N <= 0)
+        throw std::runtime_error("Invalid N, must be > 0");
+
+    // Initialize shared data
+    stop_issued = 0;
+    listen_port = N;
+
+    setupConnection();
+}
+
+Client::ElectionListener::~ElectionListener()
+{
+    close(server_socket);
+}
+
+void Client::ElectionListener::listenConnections()
+{
+    int socket = -1; // Socket assigned to the incomming connection
+
+    // Set passive listen socket
+    if (listen(server_socket, 0) < 0)
+        throw std::runtime_error(appendErrorMessage("Error setting socket as passive listener"));
+
+    // Wait for incoming connections
+    int sockaddr_size = sizeof(struct sockaddr_in);
+    while (!stop_issued && (socket = accept(server_socket, (struct sockaddr *)&client_address, (socklen_t *)&sockaddr_size)) > 0)
+    {
+        // Update the server socket
+        Client::server_socket = socket;
+        this->server_address = client_address;
+        Client::server_port = client_address.sin_port;
+
+        // Set server as reconnected
+        server_down = false;
+    }
+}
+
+void Client::ElectionListener::setupConnection()
+{
+    // Create socket
+    if ((server_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+        throw std::runtime_error(appendErrorMessage("Error during socket creation"));
+
+    // Prepare server socket address
+    server_address.sin_family = AF_INET;
+    server_address.sin_addr.s_addr = INADDR_ANY;
+    server_address.sin_port = htons(listen_port);
+
+    // Set socket options
+    int yes = 1;
+    if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1)
+        throw std::runtime_error(appendErrorMessage("Error setting socket options"));
+
+    // Bind socket
+    if (bind(server_socket, (struct sockaddr *)&server_address, sizeof(server_address)) < 0)
+        throw std::runtime_error(appendErrorMessage("Error during socket bind"));
+}
+
+//
 
 Client::Client(std::string username, std::string groupname, std::string server_ip, std::string server_port, std::string listen_port)
 {
@@ -41,11 +110,12 @@ Client::Client(std::string username, std::string groupname, std::string server_i
     this->server_socket = -1;
 
     // Start election listener
-    int lport = stoi(listen_port);
-    pthread_create(&election_listener_thread, NULL, startElectionListener, reinterpret_cast<void *>(lport));
+    Client::listen_port = stoi(listen_port);
+    pthread_create(&election_listener_thread, NULL, startElectionListener, reinterpret_cast<void *>(Client::listen_port));
 
-    // Set atomic flag as false
+    // Set atomic flags as false
     stop_issued = false;
+    server_down = false;
 
     // Initialize client interface
     ClientInterface::init(groupname, username);
@@ -82,7 +152,7 @@ void Client::setupConnection()
         throw std::runtime_error(appendErrorMessage("Error connecting to server"));
 
     // Prepare message record with login information
-    login_record = CommunicationUtils::composeMessage(username, std::string(groupname), LOGIN_MESSAGE);
+    login_record = CommunicationUtils::composeMessage(username, std::string(groupname), LOGIN_MESSAGE, (uint16_t)Client::listen_port);
 
     // Sends the command packet to the server
     CommunicationUtils::sendPacket(server_socket, PAK_COMMAND, (char *)login_record, sizeof(*login_record) + login_record->length);
@@ -114,88 +184,103 @@ void Client::getMessages()
     // Clear buffer to receive new packets
     bzero((void *)server_message, PACKET_MAX);
 
-    // Wait for messages from the server
-    while (!stop_issued && (read_bytes = CommunicationUtils::receivePacket(server_socket, server_message, PACKET_MAX)) > 0)
+    // While reconnect attempts are sucessful
+    while (!server_down)
     {
-        // Decode message into packet format
-        received_packet = (packet *)server_message;
-
-        // Try to read the rest of the payload from the socket stream
-        switch (received_packet->type)
+        // Wait for messages from the server
+        while (!stop_issued && (read_bytes = CommunicationUtils::receivePacket(server_socket, server_message, PACKET_MAX)) > 0)
         {
-        case PAK_DATA: // Data packet (messages)
+            // Decode message into packet format
+            received_packet = (packet *)server_message;
 
-            // Decode payload into a message record
-            received_message = (message_record *)received_packet->_payload;
-
-            // If message was sent by this user, change display name to "You"
-            if (strcmp(received_message->username, this->username.c_str()) == 0)
+            // Try to read the rest of the payload from the socket stream
+            switch (received_packet->type)
             {
-                sprintf(received_message->username, "%s", "You");
+            case PAK_DATA: // Data packet (messages)
+
+                // Decode payload into a message record
+                received_message = (message_record *)received_packet->_payload;
+
+                // If message was sent by this user, change display name to "You"
+                if (strcmp(received_message->username, this->username.c_str()) == 0)
+                {
+                    sprintf(received_message->username, "%s", "You");
+                }
+                // If not, add brackets to display name: [username]
+                else
+                {
+                    username = std::string("[") + received_message->username + "]";
+                    sprintf(received_message->username, "%s", username.c_str());
+                }
+
+                // Get time into a readable format
+                strftime(message_time, sizeof(message_time), "%H:%M:%S", std::localtime((time_t *)&received_message->timestamp));
+
+                if (received_message->type == SERVER_MESSAGE)
+                {
+                    chat_message = message_time + std::string(" ") + received_message->_message;
+                }
+                else if (received_message->type == USER_MESSAGE)
+                {
+                    chat_message = message_time + std::string(" ") + received_message->username + ": " + received_message->_message;
+                }
+
+                // Display message
+                ClientInterface::printMessage(chat_message);
+                break;
+
+            case PAK_SERVER_MESSAGE: // Server broadcast message for clients login/logout
+
+                // Decode payload into a message record
+                received_message = (message_record *)received_packet->_payload;
+
+                // Get time into a readable format
+                strftime(message_time, sizeof(message_time), "%H:%M:%S", std::localtime((time_t *)&received_message->timestamp));
+
+                // Display message
+                chat_message = message_time + std::string(" ") + std::string(received_message->_message);
+                ClientInterface::printMessage(chat_message);
+
+                break;
+
+            case PAK_COMMAND: // Command packet (disconnect)
+
+                // Decode payload into a message record
+                received_message = (message_record *)received_packet->_payload;
+
+                // Show message to user
+                ClientInterface::printMessage(received_message->_message);
+
+                // Stop the client application
+                stop_issued = true;
+                read_bytes = 0;
+                break;
+
+            case PAK_NEW_SERVER:
+                ClientInterface::printMessage("Connected to a new server");
+                break;
+            default: // Unknown packet
+                ClientInterface::printMessage("Received unkown packet from server");
+                break;
             }
-            // If not, add brackets to display name: [username]
-            else
-            {
-                username = std::string("[") + received_message->username + "]";
-                sprintf(received_message->username, "%s", username.c_str());
-            }
 
-            // Get time into a readable format
-            strftime(message_time, sizeof(message_time), "%H:%M:%S", std::localtime((time_t *)&received_message->timestamp));
-
-            if (received_message->type == SERVER_MESSAGE)
-            {
-                chat_message = message_time + std::string(" ") + received_message->_message;
-            }
-            else if (received_message->type == USER_MESSAGE)
-            {
-                chat_message = message_time + std::string(" ") + received_message->username + ": " + received_message->_message;
-            }
-
-            // Display message
-            ClientInterface::printMessage(chat_message);
-            break;
-
-        case PAK_SERVER_MESSAGE: // Server broadcast message for clients login/logout
-
-            // Decode payload into a message record
-            received_message = (message_record *)received_packet->_payload;
-
-            // Get time into a readable format
-            strftime(message_time, sizeof(message_time), "%H:%M:%S", std::localtime((time_t *)&received_message->timestamp));
-
-            // Display message
-            chat_message = message_time + std::string(" ") + std::string(received_message->_message);
-            ClientInterface::printMessage(chat_message);
-
-            break;
-
-        case PAK_COMMAND: // Command packet (disconnect)
-
-            // Decode payload into a message record
-            received_message = (message_record *)received_packet->_payload;
-
-            // Show message to user
-            ClientInterface::printMessage(received_message->_message);
-
-            // Stop the client application
-            stop_issued = true;
-            read_bytes = 0;
-            break;
-
-        default: // Unknown packet
-            ClientInterface::printMessage("Received unkown packet from server");
-            break;
+            // Clear buffer to receive new packets
+            bzero((void *)server_message, PACKET_MAX);
         }
 
-        // Clear buffer to receive new packets
-        bzero((void *)server_message, PACKET_MAX);
+        // Set server as down
+        server_down = true;
+
+        // If not stopping because of client action
+        if (!stop_issued)
+        {
+            // Wait
+            sleep(USER_RECONNECT_TIMEOUT);
+        }
     }
-    // If server closes connection
-    if (read_bytes == 0)
-    {
-        ClientInterface::printMessage("Connection closed by the server");
-    }
+
+    // Reset socket
+    ClientInterface::printMessage("Connection closed");
 
     // Signal input handler to stop
     stop_issued = true;
@@ -268,6 +353,7 @@ void *Client::handleUserInput(void *arg)
 
 void *Client::startElectionListener(void *arg)
 {
+
     int port = reinterpret_cast<long>(arg);
     ElectionListener *listener = new ElectionListener(port);
     listener->listenConnections();
@@ -278,14 +364,14 @@ void *Client::startElectionListener(void *arg)
 void *Client::keepAlive(void *arg)
 {
     // Useless message that will be sent to server to keep connection going
-    char keep_alive = '\0';
+    char keep_alive = 'x';
 
     while (!stop_issued)
     {
         // Sleep for SLEEP_TIME seconds between attempting to send messages to the server
         sleep(SLEEP_TIME);
 
-        if (!stop_issued)
+        if (!stop_issued && !server_down)
         {
             // Request write rights
             socket_monitor.requestWrite();

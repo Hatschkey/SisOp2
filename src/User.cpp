@@ -219,3 +219,20 @@ void User::setLastSeen()
     // Update variable
     this->last_seen = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 }
+
+void User::updateSession(int old_socket, int new_socket)
+{
+    // Request write rights
+    this->session_monitor.requestWrite();
+
+    Session *updated_session = this->sessions.at(old_socket);
+
+    // Remove the session from the user list
+    this->sessions.erase(old_socket);
+
+    // Write the new one
+    this->sessions.insert(std::make_pair(new_socket, updated_session));
+
+    // Release write rights
+    this->session_monitor.releaseWrite();
+}

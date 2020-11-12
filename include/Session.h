@@ -14,7 +14,7 @@ class Session : protected CommunicationUtils
 private:
     User *user;   // User connected to the session
     Group *group; // Group the user is connected to
-    int socket;   // Scoket through which communication happens
+    int socket;   // Socket through which communication happens
 
 public:
     /**
@@ -52,6 +52,12 @@ public:
      * @brief Retrurns user for this session 
      */
     User *getUser();
+
+    /**
+     * @brief Sets the socket where communication happens
+     * @param socket The new socket 
+     */
+    void setSocket(int socket);
 
     // SESSION LOGIC METHODS
 

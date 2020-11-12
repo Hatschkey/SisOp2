@@ -54,6 +54,15 @@ User *Session::getUser()
     return this->user;
 }
 
+void Session::setSocket(int socket)
+{
+    // Update user side socket
+    this->user->updateSession(this->socket, socket);
+
+    // Update this side's socket
+    this->socket = socket;
+}
+
 int Session::sendHistory(int N)
 {
     char read_buffer[PACKET_MAX * N]; // Buffer for messages

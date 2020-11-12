@@ -27,6 +27,7 @@ typedef struct __packet
 typedef struct __message_record
 {
     char username[23];     // User who sent this message
+    uint16_t port;         // Port where the sender is listening at for reconnections
     uint16_t length;       // Message length
     uint16_t type;         // Message's record type. Can be a SERVER_MESSAGE or USER_MESSAGE
     uint64_t timestamp;    // Message timestamp for ordering purposes
@@ -41,7 +42,6 @@ typedef struct
 {
     int identifier; // Replica unique ID
     int port;       // Replica listening port
-                    // TODO Ip? not really needed
 
 } replica_update;
 
@@ -76,13 +76,12 @@ typedef struct __election_message
 
 } election_message;
 
-// Struct that holds the new server address
-typedef struct __new_server_addr
+// Coordinator packet info, containing the new session-socket map
+typedef struct __attribute__((__packed__)) __coordinator
 {
-    in_addr_t ip;   // New server IP
-    in_port_t port; // New server Port
+    uint16_t counter;          // Number of sessions changed
+    const uint16_t _sockets[]; // Old and session socket ids
 
-} new_server_addr;
-
+} coordinator;
 
 #endif

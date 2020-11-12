@@ -27,6 +27,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
+#include <fstream>
+#include <sstream>
 
 #ifndef REPLICA_MANAGER_H
 #define REPLICA_MANAGER_H
@@ -60,7 +62,7 @@ private:
     static std::map<int, pthread_t> front_end_threads; // Socket descriptor and threads for handling front-end connections
     static RW_Monitor fe_threads_monitor;              // Monitor for front end trhead list
 
-    static std::map<int, std::pair<std::string, int>> clients; // Map with client IPs and listening ports
+    static std::map<int, std::pair<std::string, int>> clients; // Map with client socket - IPs and listening ports
     static RW_Monitor clients_monitor;                         // Monitor for the client IPs / Ports map
 
     // Replication logic
@@ -76,13 +78,14 @@ private:
     static pthread_t keep_alive_thread; // Keep alive thread
 
     // Election logic
-    static int leader;                            // Current leader process
-    static int leader_port;                       // Current leader port
-    static std::string leader_ip;                 // Current leader's IP address
-    static int leader_socket;                     // Socket where communication with the leader is going on
-    static std::map<int, bool> replicas_answered; // Map with replica id and if the replica has answered an election or not
-    static RW_Monitor ra_monitor;                 // Monitor for the replicas_answered map
-    static std::atomic<bool> election_started;    // If there is a ongoing election
+
+    static int leader;            // Current leader process
+    static int leader_port;       // Current leader port
+    static std::string leader_ip; // Current leader's IP address
+    static int leader_socket;     // Socket where communication with the leader is going on
+
+    static std::atomic<bool> got_answer;       // If someone sent an answer
+    static std::atomic<bool> election_started; // If there is a ongoing election
 
     static std::map<int, std::pair<int, int>> replicas; // Current replicas socket - id - listening-port map
     static RW_Monitor replicas_monitor;                 // Monitor for the replica list
@@ -131,6 +134,11 @@ public:
     static void setupLeaderConnection();
 
     /**
+     * @brief Configures a new connection between this replica manager and a given front-end 
+     */
+    static int setupFrontEndConnection(std::string ip, int port);
+
+    /**
      * @brief Performs the setup needed for completing the leader connection 
      */
     static void *leaderCommunication(void *arg);
@@ -150,7 +158,7 @@ public:
     /**
      * @brief Handles communication with the front ends
      */
-    static void handleFEConnection(int socket, packet *login);
+    static void *handleFEConnection(void *arg);
 
     /**
      * @brief Handles communication with the other replica managers 
@@ -182,7 +190,25 @@ public:
      */
     static void updateAllReplicas(void *update_payload, int payload_size, int type);
 
+    /**
+     * @brief All of the fucntions below perform the correct treatment
+     * when receiving an update packet from the primary replica manager 
+     */
+    static void handleLoginUpdate(packet *received_packet);
+    static void handleMessageUpdate(packet *received_packet);
+    static void handleDisconnectUpdate(packet *received_packet);
+    static void handleReplicaUpdate(packet *received_packet);
+
+    static int getReplicaBySocket(int socket);
+
+    static Session *getSessionBySocket(int socket);
+
     // ELECTION LOGIC
+
+    /**
+     * @brief Handles a received election packet 
+     */
+    static void handleElection(packet *received_packet, int incoming_socket);
 
     /**
      * @brief Start an election by sending PAK_ELECTION to every replica which id 
@@ -195,7 +221,14 @@ public:
      */
     static void removeReplicaLeader();
 
+    /**
+     * @brief Performs the necessary setup to become the new leader replica manager 
+     */
+    static void becomeLeader();
+
     // BUSINESS LOGIC
+
+    static void processNewClient(message_record *login_info, int socket);
 
     /**
      * @brief Processes a login packet
@@ -229,14 +262,15 @@ public:
     static void listThreads();
 
     /**
-     * @brief Simulates a replica crash by stopping the keep-alive thread 
-     */
-    static void simulateCrash();
-
-    /**
      * @brief Outputs current leader id
      */
     static void currentLeader();
+
+    /**
+     * @brief Outputs this replica manager's state into a file
+     * Contains every relevant data structure  
+     */
+    static void getState();
 
     // ERROR HANDLING
 

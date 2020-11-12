@@ -19,6 +19,13 @@ protected:
     static std::string appendErrorMessage(const std::string message); // Add details of the error to the message
 
     /**
+     * @brief Composes a coordniator packetfor updating session mappings
+     * @param translation The old_socket to new_socket mapping
+     * @returns Pointer to the allocated structure 
+     */
+    static coordinator *composeCoordinatorUpdate(std::map<int, int> translation);
+
+    /**
      * @brief Composes a message to start a election
      * @param vote      Value of the vote
      * @param type      Type of the message. (see constants.h)
@@ -76,10 +83,11 @@ protected:
      * @brief Creates a struct of type message_record with the provided data
      * @param sender_name Username of the user who sent this message
      * @param message_content Actual chat message
-     * @param message_type Type of message TODO
+     * @param message_type Type of message 
+     * @param port The port where the sender is listening for reconnects (None by default, regular messages)
      * @returns Pointer to the created message record
      */
-    static message_record *composeMessage(std::string sender_name, std::string message_content, int message_type);
+    static message_record *composeMessage(std::string sender_name, std::string message_content, int message_type, int port = 0xFFFF);
 
     /**
      * @brief Tries to fully receive a packet from the informed socket, putting it in buffer
