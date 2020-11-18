@@ -20,19 +20,21 @@
 #include "RW_Monitor.h"
 
 #include "ClientInterface.h"
-#include "ElectionListener.h"
 
 class Client : protected CommunicationUtils
 {
     // Private attributes
 private:
+    static std::atomic<bool> server_down; // Signlas that the server has disconnected, and app is waiting for another one
     static std::atomic<bool> stop_issued; // Atomic flag for stopping all threads
     static std::string username;          // Client display name
     std::string groupname;                // Group the client wishes to join
     std::string server_ip;                // IP of the remote server
-    int server_port;                      // Port the remote server listens at
+    static int server_port;               // Port the remote server listens at
     static int server_socket;             // Socket for remote server communication
     struct sockaddr_in server_address;    // Server socket address
+
+    static int listen_port; // Port where the client listens for reconnects
 
     static pthread_t input_handler_thread;     // Thread to listen for new incoming server messages
     static pthread_t keep_alive_thread;        // Thread to keep the client "alive" by sending periodic messages to server
@@ -69,6 +71,48 @@ public:
      */
     void getMessages();
 
+    class ElectionListener : protected CommunicationUtils
+    {
+        // Private attributes
+    private:
+        //static std::atomic<bool> stop_issued; // Atomic thread for stopping all threads
+        static int server_socket;          // Socket the server listens at for new incoming connections
+        struct sockaddr_in client_address; // Client socket address
+        static int listen_port;
+        struct sockaddr_in server_address; // Server socket address
+
+        // Public methods
+    public:
+        /**
+         * Class constructor
+         * Initializes server socket
+         * @param N Port to listen for connections
+         */
+        ElectionListener(int N);
+
+        /**
+         * Class destructor, closes any open sockets
+         */
+        ~ElectionListener();
+
+        /**
+         * Listens for incoming connections from clients
+         */
+        void listenConnections();
+
+        // Private methods
+    private:
+        /**
+         * Sets up the server socket to begin for listening
+         */
+        void setupConnection();
+
+        /**
+         * Handle any incoming connections, spawned by listenConnections
+         */
+        static void handleConnection(int socket);
+    };
+
 private:
     /**
      * Handles getting user input so that it may be sent to the remtoe server
@@ -81,10 +125,10 @@ private:
      */
     static void *keepAlive(void *arg);
 
-   /**
+    /**
     * Thread procedure that handles the socket for incomming election results
     */
-    static void* startElectionListener(void *arg);
+    static void *startElectionListener(void *arg);
 };
 
 #endif

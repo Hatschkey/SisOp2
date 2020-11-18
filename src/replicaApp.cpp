@@ -24,6 +24,6 @@ int main(int argc, char **argv)
     }
 
     // End
-    std::cout << "Replica " << argv[2] << " stopped safely." << std::endl;
+    std::cout << "Replica " << argv[3] << " stopped safely." << std::endl;
     return 0;
 }

@@ -36,5 +36,6 @@ Como utilizar:
   ~$ ./replica 5 6787 2 127.0.0.1 6789 0 # Replica ID 2
   ...
   ```
+  - Alternativamente, rodar `make run_replicas` para incializar 3 réplicas em terminais `xterm`
 - Cliente / Front-End:
   - TODO

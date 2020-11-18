@@ -106,6 +106,11 @@ public:
      * Updates the user's last seen attribute to current time
      */
     void setLastSeen();
+
+    /**
+     * @brief Updates the socket associated with this user's session 
+     */
+    void updateSession(int old_socket,int new_socket);
 };
 
 #endif

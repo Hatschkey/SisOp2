@@ -4,9 +4,13 @@ SRC := src/
 OBJ := obj/
 BIN := bin/
 INC := include/
-HIST := bin/hist/
+HIST := hist/
+REP1 := replica_1/
+REP2 := replica_2/
+REP3 := replica_3/
 
 all: dirs client server replica
+	cd bin && cp replica ${REP1} && cp replica ${REP2} && cp replica ${REP3}
 
 replica: RW_Monitor Session User Group replicaApp CommunicationUtils
 	${CC} ${OBJ}replicaApp.o ${OBJ}ReplicaManager.o ${OBJ}RW_Monitor.o ${OBJ}Session.o ${OBJ}User.o ${OBJ}Group.o ${OBJ}CommunicationUtils.o -o ${BIN}replica -lpthread -Wall
@@ -14,8 +18,8 @@ replica: RW_Monitor Session User Group replicaApp CommunicationUtils
 server: RW_Monitor Session User Group CommunicationUtils serverApp
 	${CC} ${OBJ}serverApp.o ${OBJ}Server.o ${OBJ}RW_Monitor.o ${OBJ}Session.o ${OBJ}User.o ${OBJ}Group.o ${OBJ}CommunicationUtils.o -o ${BIN}server -lpthread -Wall
 
-client: ClientInterface CommunicationUtils RW_Monitor Client clientApp ElectionListener
-	${CC} ${OBJ}ClientInterface.o ${OBJ}clientApp.o ${OBJ}Client.o ${OBJ}CommunicationUtils.o ${OBJ}RW_Monitor.o ${OBJ}ElectionListener.o -o ${BIN}client -lncurses -lpthread -Wall
+client: ClientInterface CommunicationUtils RW_Monitor Client clientApp
+	${CC} ${OBJ}ClientInterface.o ${OBJ}clientApp.o ${OBJ}Client.o ${OBJ}CommunicationUtils.o ${OBJ}RW_Monitor.o -o ${BIN}client -lncurses -lpthread -Wall
 	
 replicaApp: ReplicaManager
 	${CC} -c ${SRC}replicaApp.cpp -I ${INC} -o ${OBJ}replicaApp.o -Wall
@@ -53,19 +57,29 @@ CommunicationUtils:
 ReplicaManager:
 	${CC} -c ${SRC}ReplicaManager.cpp -I ${INC} -o ${OBJ}ReplicaManager.o -Wall
 
-ElectionListener:
-	${CC} -c ${SRC}ElectionListener.cpp -I ${INC} -o ${OBJ}ElectionListener.o -Wall
-
 dirs:
 	mkdir -p ${OBJ}
 	mkdir -p ${BIN}
-	mkdir -p ${HIST}
+	mkdir -p ${BIN}${REP1}${HIST}
+	mkdir -p ${BIN}${REP2}${HIST}
+	mkdir -p ${BIN}${REP3}${HIST}
 
-clean:	
-	rm ${OBJ}*.o ${BIN}server ${BIN}client ${BIN}replica ${HIST}*.hist
+clean:
+	rm -r ${OBJ}*.o ${BIN}*
 
 run_server: ${BIN}server
 	cd ${BIN} && ./server 50
 
 run_client: ${BIN}client
-	cd ${BIN} && ./client user group localhost 6789
+	cd ${BIN} && ./client user group localhost 6789 6000
+
+run_replicas:
+	# Start leader process
+	cd ${BIN}${REP1} && xterm -T "Replica 0 - port 6789" -hold -e valgrind --show-leak-kinds=all --track-origins=yes ./replica 5 6789 0 127.0.0.1 6789 0 &
+	
+	# Start two more replcias
+	sleep 1.5
+	cd ${BIN}${REP2} && xterm -T "Replica 1 - port 6788" -hold -e valgrind --show-leak-kinds=all --track-origins=yes ./replica 5 6788 1 127.0.0.1 6789 0 &
+
+	sleep 1.5
+	cd ${BIN}${REP3} && xterm -T "Replica 2 - port 6787" -hold -e valgrind --show-leak-kinds=all --track-origins=yes ./replica 5 6787 2 127.0.0.1 6789 0 &
